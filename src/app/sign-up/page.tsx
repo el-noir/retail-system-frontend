@@ -57,9 +57,9 @@ export default function SignUpPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10 text-slate-50">
-      <div className="w-full max-w-md space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-[0_14px_70px_-24px_rgba(0,0,0,0.85)]">
-        <div className="space-y-1 text-center">
-          <p className="text-xs uppercase tracking-[0.22em] text-emerald-300/80">Get started</p>
+      <div className="w-full max-w-md space-y-6 rounded-md border border-slate-800 bg-slate-900/80 p-8 shadow-sm">
+        <div className="space-y-1 text-left">
+          <p className="text-xs font-medium text-slate-400">Get started</p>
           <h1 className="text-2xl font-semibold text-white">Create account</h1>
           <p className="text-sm text-slate-300">Set up access to your sales dashboard.</p>
         </div>

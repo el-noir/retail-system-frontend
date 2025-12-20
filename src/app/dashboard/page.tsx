@@ -101,7 +101,7 @@ export default function DashboardPage() {
         }}
         onSuccess={handleProductSuccess}
       />
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+      <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(200px,15%),1fr] lg:items-start">
           {/* <Sidebar /> */}
@@ -109,21 +109,21 @@ export default function DashboardPage() {
           <div className="space-y-8">
             <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm uppercase tracking-[0.22em] text-emerald-300/80">Inventory</p>
+                <p className="text-sm font-medium text-slate-400">Inventory</p>
                 <h1 className="mt-1 text-3xl font-semibold text-white sm:text-4xl">Products</h1>
                 <p className="text-sm text-slate-300">Manage and track your product inventory.</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.7)] backdrop-blur">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500" />
+                <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
+                  <div className="h-10 w-10 bg-emerald-600 text-slate-950 flex items-center justify-center text-sm font-semibold">{products.length}</div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Total Products</p>
-                    <p className="text-sm font-medium text-white">{products.length}</p>
+                    <p className="text-xs font-medium text-slate-400">Total products</p>
+                    <p className="text-sm font-medium text-white">Updated live</p>
                   </div>
                 </div>
                 <Button
                   onClick={handleAddClick}
-                  className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-xs font-semibold text-emerald-100 shadow-[0_10px_30px_-18px_rgba(16,185,129,0.7)] transition hover:border-emerald-300/80 hover:text-white"
+                  className="border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white rounded-sm hover:bg-emerald-700"
                 >
                   Add product
                 </Button>
@@ -131,20 +131,20 @@ export default function DashboardPage() {
             </header>
 
             {isLoading ? (
-              <div className="flex min-h-80 items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-6">
+              <div className="flex min-h-80 items-center justify-center rounded-md border border-slate-800 bg-slate-900 p-6">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400" />
               </div>
             ) : products.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-center">
+              <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-left">
                 <p className="text-slate-300">No products found. Click "Add product" to create one.</p>
               </div>
             ) : (
-              <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_14px_70px_-24px_rgba(0,0,0,0.85)]">
-                <div className="mb-6">
+              <section className="rounded-md border border-slate-800 bg-slate-900 p-6">
+                <div className="mb-4">
                   <h2 className="text-xl font-semibold text-white">All Products</h2>
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-white/10">
-                  <div className="grid grid-cols-6 gap-4 bg-white/5 px-4 py-3 text-xs uppercase tracking-[0.14em] text-slate-400">
+                <div className="overflow-hidden rounded-sm border border-slate-800">
+                  <div className="grid grid-cols-6 gap-4 bg-slate-900 px-4 py-3 text-xs font-semibold text-slate-400 uppercase">
                     <span>Name</span>
                     <span>SKU</span>
                     <span>Category</span>
@@ -152,21 +152,21 @@ export default function DashboardPage() {
                     <span>Stock</span>
                     <span>Actions</span>
                   </div>
-                  <div className="divide-y divide-white/10 bg-white/5">
+                  <div className="divide-y divide-slate-800 bg-slate-950/40">
                     {products.map((product) => (
                       <div
                         key={product.id}
-                        className="grid grid-cols-6 gap-4 items-center px-4 py-3 text-sm text-slate-100 hover:bg-white/5"
+                        className="grid grid-cols-6 gap-4 items-center px-4 py-3 text-sm text-slate-100 hover:bg-slate-900"
                       >
                         <span className="font-medium text-white truncate">{product.name}</span>
                         <span className="text-slate-300">{product.sku}</span>
                         <span className="text-slate-300">{product.category.name}</span>
                         <span className="font-semibold text-white">${formatPrice(product.price)}</span>
                         <span
-                          className={`rounded-full px-3 py-1 text-center text-xs font-semibold ${
+                          className={`rounded-sm px-2 py-1 text-center text-xs font-semibold ${
                             product.stock > 0
-                              ? 'bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30'
-                              : 'bg-red-500/15 text-red-200 ring-1 ring-red-400/30'
+                              ? 'bg-emerald-800/30 text-emerald-200 border border-emerald-700'
+                              : 'bg-red-800/30 text-red-200 border border-red-700'
                           }`}
                         >
                           {product.stock}
@@ -176,7 +176,7 @@ export default function DashboardPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditClick(product)}
-                            className="h-8 w-8 p-0 rounded-lg bg-blue-500/10 text-blue-200 hover:bg-blue-500/20"
+                            className="h-8 w-8 p-0 rounded-sm border border-slate-700 bg-slate-900 text-slate-200 hover:border-blue-400"
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
                             size="sm"
                             onClick={() => handleDeleteClick(product.id)}
                             disabled={isDeleting === product.id}
-                            className="h-8 w-8 p-0 rounded-lg bg-red-500/10 text-red-200 hover:bg-red-500/20"
+                            className="h-8 w-8 p-0 rounded-sm border border-slate-700 bg-slate-900 text-red-200 hover:border-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

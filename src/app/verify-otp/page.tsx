@@ -57,16 +57,16 @@ export default function VerifyOtpPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950 px-4">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
-                <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-t-lg">
-                    <CardTitle className="text-2xl font-bold">Verify Your Email</CardTitle>
-                    <CardDescription className="text-emerald-50">
-                        Enter the 6-digit OTP sent to {email}
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+            <Card className="w-full max-w-md border border-slate-800 bg-slate-900/85 rounded-md">
+                <CardHeader className="pb-2 text-left">
+                    <CardTitle className="text-2xl font-semibold text-white">Verify your email</CardTitle>
+                    <CardDescription className="text-slate-300">
+                        Enter the 6-digit code we sent to {email}
                     </CardDescription>
                 </CardHeader>
 
-                <CardContent className="pt-6">
+                <CardContent className="pt-4">
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div>
                             <label htmlFor="otp" className="block text-sm font-medium text-slate-200 mb-2">
@@ -77,7 +77,7 @@ export default function VerifyOtpPage() {
                                 placeholder="000000"
                                 maxLength={6}
                                 {...register('otp')}
-                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 text-center text-2xl letter-spacing-2 font-mono"
+                                className="bg-slate-800 border-slate-700 text-white placeholder-slate-500 text-center text-xl font-mono"
                                 disabled={isSubmitting}
                             />
                             {errors.otp && (
@@ -85,39 +85,39 @@ export default function VerifyOtpPage() {
                             )}
                         </div>
 
-                        <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-3">
-                            <p className="text-xs text-emerald-200">
-                                💡 OTP is valid for <strong>10 minutes</strong>. Check your email for the code.
+                        <div className="border border-slate-800 rounded-sm p-3 bg-slate-900">
+                            <p className="text-xs text-slate-300">
+                                OTP is valid for <strong>10 minutes</strong>. Check your email for the code.
                             </p>
                         </div>
 
                         <Button
                             type="submit"
-                            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold py-2 rounded-lg transition"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-sm transition"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? 'Verifying...' : 'Verify OTP'}
                         </Button>
                     </form>
 
-                    <div className="mt-6 text-center">
+                    <div className="mt-6 text-left">
                         <p className="text-slate-400 text-sm">
                             Didn't receive the code?{' '}
                             <button
                                 onClick={() => {
                                     toast.info('Resend functionality coming soon');
                                 }}
-                                className="text-emerald-400 hover:text-emerald-300 font-medium"
+                                className="text-emerald-400 hover:text-emerald-300 font-medium underline"
                             >
                                 Resend OTP
                             </button>
                         </p>
                     </div>
 
-                    <div className="mt-4 text-center border-t border-slate-700 pt-4">
+                    <div className="mt-4 text-left border-t border-slate-800 pt-4">
                         <p className="text-slate-400 text-sm">
                             Want to use a different email?{' '}
-                            <Link href="/sign-up" className="text-emerald-400 hover:text-emerald-300 font-medium">
+                            <Link href="/sign-up" className="text-emerald-400 hover:text-emerald-300 font-medium underline">
                                 Sign up again
                             </Link>
                         </p>
