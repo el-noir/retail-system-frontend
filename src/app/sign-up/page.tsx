@@ -30,7 +30,9 @@ export default function SignUpPage() {
   })
 
   React.useEffect(() => {
-    if (hydrated && isAuthenticated) {
+    // Prevent redirect to dashboard when we're in the middle of OTP flow
+    const pendingOtp = typeof window !== 'undefined' ? sessionStorage.getItem('pending_otp') === 'true' : false
+    if (hydrated && isAuthenticated && !pendingOtp) {
       router.replace('/dashboard')
     }
   }, [hydrated, isAuthenticated, router])
@@ -39,9 +41,13 @@ export default function SignUpPage() {
     setIsLoading(true)
     try {
       const { access_token } = await signUp(values)
+      // Mark that user needs to complete OTP to avoid sign-up page redirect racing back to dashboard
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pending_otp', 'true')
+      }
       setToken(access_token)
-      toast.success('Account created')
-      router.push('/dashboard')
+      toast.success('Account created! Please verify your email.')
+      router.push(`/verify-otp?email=${encodeURIComponent(values.email)}`)
     } catch (error: any) {
       toast.error(error?.message || 'Failed to sign up')
     } finally {
