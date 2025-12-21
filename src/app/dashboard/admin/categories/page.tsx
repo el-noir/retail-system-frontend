@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createCategory, deleteCategory, getCategories, type Category, updateCategory } from '@/lib/api/categories'
 import { useAuth } from '@/lib/auth/auth-context'
+import { useDebounce } from '@/lib/hooks/useDebounce'
 import { useRouter } from 'next/navigation'
 
 export default function CategoriesPage() {
@@ -124,11 +125,13 @@ export default function CategoriesPage() {
     router.push('/sign-in')
   }, [clearToken, router])
 
+  const debouncedSearch = useDebounce(search, 300)
+
   const filteredCategories = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
     if (!q) return categories
     return categories.filter((c) => c.name.toLowerCase().includes(q))
-  }, [categories, search])
+  }, [categories, debouncedSearch])
 
   return (
     <ProtectedRoute>

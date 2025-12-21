@@ -10,6 +10,7 @@ import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
 import { getProducts, type Product } from '@/lib/api/products'
 import { createSale, type CreateSalePayload } from '@/lib/api/sales'
 import { useAuth } from '@/lib/auth/auth-context'
+import { useDebouncedCallback } from '@/lib/hooks/useDebouncedCallback'
 
 type CartItem = {
   product: Product
@@ -95,6 +96,14 @@ export default function CashierDashboardPage() {
       ),
     )
   }
+
+  const debouncedSetTax = useDebouncedCallback((value: number) => {
+    setTaxAmount(value)
+  }, 300)
+
+  const debouncedSetDiscount = useDebouncedCallback((value: number) => {
+    setDiscountAmount(value)
+  }, 300)
 
   const subtotal = cart.reduce((sum, ci) => sum + Number(ci.product.price) * ci.quantity, 0)
   const total = subtotal + (taxAmount || 0) - (discountAmount || 0)
@@ -232,8 +241,8 @@ export default function CashierDashboardPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        value={taxAmount}
-                        onChange={(e) => setTaxAmount(parseFloat(e.target.value || '0'))}
+                        defaultValue={taxAmount}
+                        onChange={(e) => debouncedSetTax(parseFloat(e.target.value || '0'))}
                         className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
                       />
                     </div>
@@ -243,8 +252,8 @@ export default function CashierDashboardPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        value={discountAmount}
-                        onChange={(e) => setDiscountAmount(parseFloat(e.target.value || '0'))}
+                        defaultValue={discountAmount}
+                        onChange={(e) => debouncedSetDiscount(parseFloat(e.target.value || '0'))}
                         className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
                       />
                     </div>

@@ -14,6 +14,7 @@ import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
 import { deleteProduct, getProductsPage, type Product } from '@/lib/api/products'
 import { stockIn, stockOut } from '@/lib/api/stock'
 import { useAuth } from '@/lib/auth/auth-context'
+import { useDebounce } from '@/lib/hooks/useDebounce'
 import { useRouter } from 'next/navigation'
 
 export default function AdminDashboardPage() {
@@ -170,15 +171,17 @@ export default function AdminDashboardPage() {
     return { label: 'In Stock', className: 'bg-emerald-900/30 text-emerald-100 border-emerald-700' }
   }
 
+  const debouncedSearch = useDebounce(search, 300)
+
   const filteredProducts = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
     if (!q) return products
     return products.filter(p =>
       p.name.toLowerCase().includes(q) ||
       (p.sku?.toLowerCase().includes(q)) ||
       (p.category?.name?.toLowerCase().includes(q))
     )
-  }, [products, search])
+  }, [products, debouncedSearch])
 
   return (
     <ProtectedRoute>
