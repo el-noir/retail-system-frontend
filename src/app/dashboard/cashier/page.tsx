@@ -10,6 +10,7 @@ import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
 import { getProducts, type Product } from '@/lib/api/products'
 import { createSale, type CreateSalePayload } from '@/lib/api/sales'
 import { useAuth } from '@/lib/auth/auth-context'
+import { useDebounce } from '@/lib/hooks/useDebounce'
 import { useDebouncedCallback } from '@/lib/hooks/useDebouncedCallback'
 
 type CartItem = {
@@ -23,6 +24,7 @@ export default function CashierDashboardPage() {
   const [lowStock, setLowStock] = React.useState<LowStockProduct[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [cart, setCart] = React.useState<CartItem[]>([])
+  const [search, setSearch] = React.useState('')
   const [customerName, setCustomerName] = React.useState('')
   const [customerPhone, setCustomerPhone] = React.useState('')
   const [paymentMethod, setPaymentMethod] = React.useState<'cash' | 'card'>('cash')
@@ -69,6 +71,12 @@ export default function CashierDashboardPage() {
     return isNaN(num) ? '0.00' : num.toFixed(2)
   }
 
+  const stockStatus = (stock: number) => {
+    if (stock === 0) return { label: 'Out of stock', className: 'bg-red-900/40 text-red-200 border-red-700' }
+    if (stock <= 10) return { label: 'Low stock', className: 'bg-amber-900/30 text-amber-100 border-amber-700' }
+    return { label: 'In stock', className: 'bg-emerald-900/30 text-emerald-100 border-emerald-700' }
+  }
+
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((ci) => ci.product.id === product.id)
@@ -107,6 +115,18 @@ export default function CashierDashboardPage() {
 
   const subtotal = cart.reduce((sum, ci) => sum + Number(ci.product.price) * ci.quantity, 0)
   const total = subtotal + (taxAmount || 0) - (discountAmount || 0)
+
+  const debouncedSearch = useDebounce(search, 300)
+
+  const filteredProducts = React.useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    if (!q) return products
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.sku?.toLowerCase().includes(q)) ||
+      (p.category?.name?.toLowerCase().includes(q))
+    )
+  }, [products, debouncedSearch])
 
   const checkout = async () => {
     if (cart.length === 0) {
@@ -169,31 +189,84 @@ export default function CashierDashboardPage() {
             {isLoading ? (
               <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading products...</div>
             ) : (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-white">Products</h2>
-                  <p className="text-sm text-slate-400">Sell only — no edits</p>
+              <section className="space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">Products</h2>
+                    <p className="text-sm text-slate-400">Sell only — no edits</p>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+                    <span className="font-semibold">Cart items:</span>
+                    <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-emerald-200">{cart.length}</span>
+                  </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {products.map((product) => (
-                    <div key={product.id} className="space-y-3 rounded-md border border-slate-800 bg-slate-900 p-4">
-                      <div>
-                        <p className="text-lg font-semibold text-white">{product.name}</p>
-                        <p className="text-xs text-slate-400">SKU: {product.sku}</p>
-                        <p className="text-xs text-slate-400">Category: {product.category?.name ?? 'Uncategorized'}</p>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-slate-200">
-                        <span className="font-mono text-emerald-300">${formatPrice(product.price)}</span>
-                        <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-100">{product.stock} in stock</span>
-                      </div>
-                      <Button
-                        className="w-full rounded-sm border border-emerald-600 bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700"
-                        onClick={() => addToCart(product)}
-                      >
-                        Add to bill
-                      </Button>
-                    </div>
-                  ))}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Input
+                    placeholder="Search products, SKU or category"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full sm:w-96 rounded-sm border-slate-700 bg-slate-900 text-slate-100"
+                  />
+                  <div className="text-sm text-slate-400">
+                    Showing {filteredProducts.length} of {products.length}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-900">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-900 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <th className="px-4 py-3 text-left">Product</th>
+                        <th className="px-4 py-3 text-left">Category</th>
+                        <th className="px-4 py-3 text-right">Stock</th>
+                        <th className="px-4 py-3 text-left">Status</th>
+                        <th className="px-4 py-3 text-right">Price</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.map((product, idx) => {
+                        const status = stockStatus(product.stock)
+                        const isOut = product.stock === 0
+                        return (
+                          <tr key={product.id} className={idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-950'}>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="space-y-1">
+                                <p className="font-semibold text-white">{product.name}</p>
+                                <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-middle text-slate-300">{product.category?.name ?? 'Uncategorized'}</td>
+                            <td className="px-4 py-3 align-middle text-right">
+                              <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-100">{product.stock}</span>
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <span className={`inline-flex rounded-sm border px-2 py-1 text-xs font-semibold ${status.className}`}>{status.label}</span>
+                            </td>
+                            <td className="px-4 py-3 align-middle text-right font-mono text-emerald-300">${formatPrice(product.price)}</td>
+                            <td className="px-4 py-3 align-middle text-right">
+                              <Button
+                                size="sm"
+                                className="rounded-sm border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() => addToCart(product)}
+                                disabled={isOut}
+                              >
+                                {isOut ? 'Unavailable' : 'Add to bill'}
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {filteredProducts.length === 0 && (
+                        <tr>
+                          <td className="px-4 py-6 text-center text-slate-400" colSpan={6}>
+                            No products match your search.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}
@@ -241,7 +314,7 @@ export default function CashierDashboardPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        defaultValue={taxAmount}
+                        value={taxAmount}
                         onChange={(e) => debouncedSetTax(parseFloat(e.target.value || '0'))}
                         className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
                       />
@@ -252,7 +325,7 @@ export default function CashierDashboardPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        defaultValue={discountAmount}
+                        value={discountAmount}
                         onChange={(e) => debouncedSetDiscount(parseFloat(e.target.value || '0'))}
                         className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
                       />
