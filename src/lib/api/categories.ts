@@ -5,6 +5,9 @@ export type Category = {
   name: string
   createdAt: string
   updatedAt: string
+  _count?: {
+    products: number
+  }
 }
 
 export async function getCategories(limit: number = 100, offset: number = 0) {
@@ -38,8 +41,7 @@ export async function updateCategory(id: number, name: string) {
 }
 
 export async function deleteCategory(id: number) {
-  const data = await apiFetch(`/categories/${id}`, {
+  await apiFetch(`/categories/${id}`, {
     method: 'DELETE',
   })
-  return data
 }

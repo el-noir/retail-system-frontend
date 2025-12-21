@@ -11,6 +11,14 @@ export async function handleResponse(res: Response) {
   const data = isJson ? await res.json() : await res.text()
 
   if (!res.ok) {
+    // Enhanced error logging for debugging
+    console.error('API Error:', {
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      data,
+    })
+    
     const message = typeof data === 'string' ? data : data?.message || 'Request failed'
     throw new Error(Array.isArray(message) ? message.join(', ') : message)
   }
@@ -19,14 +27,20 @@ export async function handleResponse(res: Response) {
 }
 
 export async function apiFetch(path: string, options: ApiFetchOptions = {}) {
-  const { auth = true, json, headers, ...rest } = options
+  const { auth = true, json, headers, body, ...rest } = options
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
 
   const mergedHeaders = new Headers(headers || undefined)
+  
+  let finalBody = body
 
-  if (json !== undefined) {
+  if (body) {
+    if (!mergedHeaders.has('Content-Type')) {
+      mergedHeaders.set('Content-Type', 'application/json')
+    }
+  } else if (json !== undefined) {
     mergedHeaders.set('Content-Type', 'application/json')
-    rest.body = JSON.stringify(json)
+    finalBody = JSON.stringify(json)
   }
 
   if (auth && token && !mergedHeaders.has('Authorization')) {
@@ -35,6 +49,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}) {
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
+    body: finalBody,
     headers: mergedHeaders,
   })
 

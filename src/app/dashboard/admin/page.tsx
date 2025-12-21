@@ -21,14 +21,7 @@ export default function AdminDashboardPage() {
   const { token, clearToken } = useAuth()
 
   const [products, setProducts] = React.useState<Product[]>([])
-  const [categories, setCategories] = React.useState<Category[]>([
-    { id: 1, name: 'Electronics', createdAt: '', updatedAt: '' },
-    { id: 2, name: 'Clothing', createdAt: '', updatedAt: '' },
-    { id: 3, name: 'Food & Beverages', createdAt: '', updatedAt: '' },
-    { id: 4, name: 'Books', createdAt: '', updatedAt: '' },
-    { id: 5, name: 'Home & Garden', createdAt: '', updatedAt: '' },
-    { id: 6, name: 'Sports & Outdoors', createdAt: '', updatedAt: '' },
-  ])
+  const [categories, setCategories] = React.useState<Category[]>([])
   const [lowStock, setLowStock] = React.useState<LowStockProduct[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [limit, setLimit] = React.useState(10)
@@ -84,7 +77,7 @@ export default function AdminDashboardPage() {
           const categoriesData = await getCategories(100, 0)
           setCategories(categoriesData)
         } catch (error) {
-          console.warn('Failed to fetch categories from API, using defaults:', error)
+          console.warn('Failed to fetch categories from API:', error)
         }
       } catch (error: any) {
         toast.error(error?.message || 'Failed to load dashboard data')
