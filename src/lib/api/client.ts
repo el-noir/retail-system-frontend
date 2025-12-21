@@ -28,7 +28,13 @@ export async function handleResponse(res: Response) {
 
 export async function apiFetch(path: string, options: ApiFetchOptions = {}) {
   const { auth = true, json, headers, body, ...rest } = options
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  
+  // Try to get token from localStorage first, then from session storage (for temporary registration token)
+  let token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  
+  if (!token && typeof window !== 'undefined' && path.includes('finalize-registration')) {
+    token = sessionStorage.getItem('temp_registration_token')
+  }
 
   const mergedHeaders = new Headers(headers || undefined)
   

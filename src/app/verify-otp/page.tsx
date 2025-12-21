@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth/auth-context';
-import { apiFetch } from '@/lib/api/client';
+import { verifyOtp, finalizeRegistration } from '@/lib/api/auth';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
 import Link from 'next/link';
@@ -22,7 +22,7 @@ type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
 export default function VerifyOtpPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { isAuthenticated, token } = useAuth();
+    const { setToken } = useAuth();
     const email = searchParams.get('email') || '';
 
     // Stay on this page even if authenticated; user needs to verify OTP.
@@ -37,18 +37,23 @@ export default function VerifyOtpPage() {
 
     const onSubmit = async (data: VerifyOtpInput) => {
         try {
-            await apiFetch('/auth/verify-otp', {
-                method: 'POST',
-                json: {
-                    email,
-                    otp: data.otp,
-                },
-            });
-
+            // Step 1: Verify OTP with backend
+            await verifyOtp(email, data.otp);
             toast.success('Email verified successfully!');
+
+            // Step 2: Finalize registration (create user and get real token)
+            const result = await finalizeRegistration();
+            
+            // Step 3: Store the real token and clear temporary data
+            setToken(result.access_token);
+            
             if (typeof window !== 'undefined') {
                 sessionStorage.removeItem('pending_otp');
+                sessionStorage.removeItem('temp_registration_token');
+                sessionStorage.removeItem('registration_email');
             }
+            
+            toast.success('Account created successfully!');
             router.push('/dashboard');
         } catch (error: any) {
             const message = error?.message || 'Invalid or expired OTP';

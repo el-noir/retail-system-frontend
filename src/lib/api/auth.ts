@@ -20,5 +20,24 @@ export async function signUp(payload: z.infer<typeof SignUpSchema>) {
     json: payload,
   })
 
-  return data as { access_token: string }
+  return data as { access_token: string; requiresOtpVerification: boolean; message: string }
+}
+
+export async function verifyOtp(email: string, otp: string) {
+  const data = await apiFetch('/auth/verify-otp', {
+    method: 'POST',
+    auth: false,
+    json: { email, otp },
+  })
+
+  return data as { message: string }
+}
+
+export async function finalizeRegistration() {
+  const data = await apiFetch('/auth/finalize-registration', {
+    method: 'POST',
+    auth: true,
+  })
+
+  return data as { access_token: string; message: string }
 }

@@ -30,7 +30,7 @@ export default function SignUpPage() {
   })
 
   React.useEffect(() => {
-    // Prevent redirect to dashboard when we're in the middle of OTP flow
+    // Only redirect if already authenticated and NOT in pending OTP state
     const pendingOtp = typeof window !== 'undefined' ? sessionStorage.getItem('pending_otp') === 'true' : false
     if (hydrated && isAuthenticated && !pendingOtp) {
       router.replace('/dashboard')
@@ -40,13 +40,17 @@ export default function SignUpPage() {
   const onSubmit = async (values: z.infer<typeof SignUpSchema>) => {
     setIsLoading(true)
     try {
-      const { access_token } = await signUp(values)
-      // Mark that user needs to complete OTP to avoid sign-up page redirect racing back to dashboard
+      const result = await signUp(values)
+      
+      // Store temporary token (valid for 10 minutes) for OTP verification only
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('pending_otp', 'true')
+        sessionStorage.setItem('temp_registration_token', result.access_token)
+        sessionStorage.setItem('registration_email', values.email)
       }
-      setToken(access_token)
-      toast.success('Account created! Please verify your email.')
+      
+      // Don't set the main auth token yet - user is not registered
+      toast.success('Verification code sent to your email!')
       router.push(`/verify-otp?email=${encodeURIComponent(values.email)}`)
     } catch (error: any) {
       toast.error(error?.message || 'Failed to sign up')
@@ -104,6 +108,9 @@ export default function SignUpPage() {
                     <Input type="password" placeholder="********" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Requires: 8+ chars, uppercase, lowercase, number, and special character (!@#$%^&*)
+                  </p>
                 </FormItem>
               )}
             />
