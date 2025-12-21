@@ -20,3 +20,26 @@ export async function getCategoryById(id: number) {
   })
   return data as Category
 }
+
+export async function createCategory(name: string) {
+  const data = await apiFetch('/categories', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+  return data as Category
+}
+
+export async function updateCategory(id: number, name: string) {
+  const data = await apiFetch(`/categories/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+  return data as Category
+}
+
+export async function deleteCategory(id: number) {
+  const data = await apiFetch(`/categories/${id}`, {
+    method: 'DELETE',
+  })
+  return data
+}

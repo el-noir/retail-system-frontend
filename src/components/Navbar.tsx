@@ -10,12 +10,26 @@ import { Button } from './ui/button'
 
 export default function Navbar() {
   const router = useRouter()
-  const { isAuthenticated, clearToken } = useAuth()
+  const { isAuthenticated, clearToken, token } = useAuth()
 
   const handleSignOut = () => {
     clearToken()
     router.push('/sign-in')
   }
+
+  const userInfo = React.useMemo(() => {
+    if (!token) return null
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1] ?? ''))
+      return {
+        email: payload?.email as string | undefined,
+        role: (payload?.role as string | undefined) ?? 'UNKNOWN',
+      }
+    } catch (error) {
+      console.warn('Failed to parse token payload', error)
+      return null
+    }
+  }, [token])
 
   return (
     <nav className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950">
@@ -31,7 +45,12 @@ export default function Navbar() {
         </div>
 
         {isAuthenticated ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {userInfo?.role && (
+              <span className="hidden rounded-sm bg-emerald-600 px-2 py-1 text-xs font-semibold text-slate-950 sm:inline-flex">
+                {userInfo.role}
+              </span>
+            )}
             <Link href="/dashboard">
               <Button
                 variant="ghost"
@@ -40,6 +59,7 @@ export default function Navbar() {
                 <User className="mr-2 h-4 w-4" /> Profile
               </Button>
             </Link>
+
             <Button
               variant="outline"
               onClick={handleSignOut}

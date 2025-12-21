@@ -20,7 +20,8 @@ export async function getProducts(limit: number = 10, offset: number = 0) {
   const data = await apiFetch(`/products?limit=${limit}&offset=${offset}`, {
     method: 'GET',
   })
-  return data as Product[]
+  // Backend returns { items, pagination }. Keep backward compatibility by returning items.
+  return (data?.items ?? data) as Product[]
 }
 
 export async function getProductById(id: number) {
@@ -72,4 +73,33 @@ export async function getProductsByCategory(categoryId: number) {
     method: 'GET',
   })
   return data as Product[]
+}
+
+export type ProductsPage = {
+  items: Product[]
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    pages: number
+    currentPage: number
+  }
+}
+
+export async function getProductsPage(limit: number = 10, offset: number = 0) {
+  const data = await apiFetch(`/products?limit=${limit}&offset=${offset}`, {
+    method: 'GET',
+  })
+  // Ensure we always return a structured page
+  if (data?.items && data?.pagination) return data as ProductsPage
+  return {
+    items: (Array.isArray(data) ? data : []) as Product[],
+    pagination: {
+      total: Array.isArray(data) ? (data as Product[]).length : 0,
+      limit,
+      offset,
+      pages: 1,
+      currentPage: 1,
+    },
+  } as ProductsPage
 }

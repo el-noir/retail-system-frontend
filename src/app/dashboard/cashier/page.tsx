@@ -1,0 +1,321 @@
+'use client'
+
+import React from 'react'
+import { toast } from 'sonner'
+
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
+import { getProducts, type Product } from '@/lib/api/products'
+import { createSale, type CreateSalePayload } from '@/lib/api/sales'
+import { useAuth } from '@/lib/auth/auth-context'
+
+type CartItem = {
+  product: Product
+  quantity: number
+}
+
+export default function CashierDashboardPage() {
+  const { token } = useAuth()
+  const [products, setProducts] = React.useState<Product[]>([])
+  const [lowStock, setLowStock] = React.useState<LowStockProduct[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [cart, setCart] = React.useState<CartItem[]>([])
+  const [customerName, setCustomerName] = React.useState('')
+  const [customerPhone, setCustomerPhone] = React.useState('')
+  const [paymentMethod, setPaymentMethod] = React.useState<'cash' | 'card'>('cash')
+  const [taxAmount, setTaxAmount] = React.useState(0)
+  const [discountAmount, setDiscountAmount] = React.useState(0)
+  const [checkingOut, setCheckingOut] = React.useState(false)
+
+  const role = React.useMemo(() => {
+    if (!token) return 'UNKNOWN'
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1] ?? ''))
+      return (payload?.role as string | undefined)?.toUpperCase() ?? 'UNKNOWN'
+    } catch (error) {
+      console.warn('Failed to parse token payload', error)
+      return 'UNKNOWN'
+    }
+  }, [token])
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const productsData = await getProducts(100, 0)
+        setProducts(productsData)
+
+        try {
+          const low = await getLowStockProducts(10, 10, 0)
+          setLowStock(low.products)
+        } catch (error) {
+          console.warn('Failed to fetch low stock list', error)
+        }
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to load products')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const formatPrice = (value: unknown) => {
+    const num = typeof value === 'number' ? value : parseFloat(String(value))
+    return isNaN(num) ? '0.00' : num.toFixed(2)
+  }
+
+  const addToCart = (product: Product) => {
+    setCart((prev) => {
+      const existing = prev.find((ci) => ci.product.id === product.id)
+      if (existing) {
+        return prev.map((ci) =>
+          ci.product.id === product.id
+            ? { ...ci, quantity: Math.min(ci.quantity + 1, product.stock) }
+            : ci,
+        )
+      }
+      return [...prev, { product, quantity: 1 }]
+    })
+  }
+
+  const removeFromCart = (productId: number) => {
+    setCart((prev) => prev.filter((ci) => ci.product.id !== productId))
+  }
+
+  const updateQuantity = (productId: number, quantity: number) => {
+    setCart((prev) =>
+      prev.map((ci) =>
+        ci.product.id === productId
+          ? { ...ci, quantity: Math.max(1, Math.min(quantity, ci.product.stock)) }
+          : ci,
+      ),
+    )
+  }
+
+  const subtotal = cart.reduce((sum, ci) => sum + Number(ci.product.price) * ci.quantity, 0)
+  const total = subtotal + (taxAmount || 0) - (discountAmount || 0)
+
+  const checkout = async () => {
+    if (cart.length === 0) {
+      toast.error('Add items to the cart before checkout')
+      return
+    }
+
+    const payload: CreateSalePayload = {
+      items: cart.map((ci) => ({ productId: ci.product.id, quantity: ci.quantity })),
+      customerName: customerName || undefined,
+      customerPhone: customerPhone || undefined,
+      taxAmount: taxAmount || 0,
+      discountAmount: discountAmount || 0,
+      paymentMethod,
+    }
+
+    try {
+      setCheckingOut(true)
+      const sale = await createSale(payload)
+      toast.success(`Sale complete. Invoice: ${sale.invoiceNumber}`)
+      // Reset cart
+      setCart([])
+      setCustomerName('')
+      setCustomerPhone('')
+      setTaxAmount(0)
+      setDiscountAmount(0)
+      // Refresh products to get updated stock
+      const updated = await getProducts(100, 0)
+      setProducts(updated)
+      // Offer quick access to invoice
+      // navigate user to receipt view in new tab
+      window.open(`/sales/${sale.invoiceNumber}`, '_blank')
+    } catch (error: any) {
+      toast.error(error?.message || 'Checkout failed')
+    } finally {
+      setCheckingOut(false)
+    }
+  }
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-slate-950 text-slate-50">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-400">Point of sale</p>
+              <h1 className="mt-1 text-3xl font-semibold text-white sm:text-4xl">Cashier dashboard</h1>
+              <p className="text-sm text-slate-300">Role: {role}</p>
+            </div>
+            <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
+              <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">{products.length}</div>
+              <div>
+                <p className="text-xs font-medium text-slate-400">Products available</p>
+                <p className="text-sm font-medium text-white">Ready to sell</p>
+              </div>
+            </div>
+          </header>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-[2fr,1fr]">
+            {isLoading ? (
+              <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading products...</div>
+            ) : (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-white">Products</h2>
+                  <p className="text-sm text-slate-400">Sell only — no edits</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {products.map((product) => (
+                    <div key={product.id} className="space-y-3 rounded-md border border-slate-800 bg-slate-900 p-4">
+                      <div>
+                        <p className="text-lg font-semibold text-white">{product.name}</p>
+                        <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+                        <p className="text-xs text-slate-400">Category: {product.category?.name ?? 'Uncategorized'}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-slate-200">
+                        <span className="font-mono text-emerald-300">${formatPrice(product.price)}</span>
+                        <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-100">{product.stock} in stock</span>
+                      </div>
+                      <Button
+                        className="w-full rounded-sm border border-emerald-600 bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700"
+                        onClick={() => addToCart(product)}
+                      >
+                        Add to bill
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <aside className="rounded-md border border-slate-800 bg-slate-900 p-4">
+              <h2 className="mb-3 text-lg font-semibold text-white">Current bill</h2>
+              {cart.length === 0 ? (
+                <p className="text-sm text-slate-400">No items added yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map((ci) => (
+                    <div key={ci.product.id} className="flex items-center justify-between rounded-sm border border-slate-800 bg-slate-950 p-3">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-semibold text-white">{ci.product.name}</p>
+                        <p className="text-xs text-slate-400">${formatPrice(ci.product.price)} each</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={ci.product.stock}
+                          value={ci.quantity}
+                          onChange={(e) => updateQuantity(ci.product.id, parseInt(e.target.value || '1', 10))}
+                          className="h-8 w-16 rounded-sm border-slate-700 bg-slate-900 text-slate-100"
+                        />
+                        <Button
+                          variant="ghost"
+                          className="h-8 rounded-sm border border-red-600/70 bg-slate-900 px-2 text-xs text-red-200 hover:bg-red-900"
+                          onClick={() => removeFromCart(ci.product.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="space-y-2 border-t border-slate-800 pt-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">Subtotal</span>
+                      <span className="font-mono text-emerald-300">${formatPrice(subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">Tax</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={taxAmount}
+                        onChange={(e) => setTaxAmount(parseFloat(e.target.value || '0'))}
+                        className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">Discount</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={discountAmount}
+                        onChange={(e) => setDiscountAmount(parseFloat(e.target.value || '0'))}
+                        className="h-8 w-24 rounded-sm border-slate-700 bg-slate-900 text-right font-mono text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm font-semibold">
+                      <span className="text-slate-200">Total</span>
+                      <span className="font-mono text-emerald-300">${formatPrice(total)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Customer name (optional)"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="rounded-sm border-slate-700 bg-slate-900 text-slate-100"
+                    />
+                    <Input
+                      placeholder="Customer phone (optional)"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="rounded-sm border-slate-700 bg-slate-900 text-slate-100"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <Button
+                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                      className="rounded-sm border border-emerald-600 bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700"
+                      onClick={() => setPaymentMethod('cash')}
+                    >
+                      Cash
+                    </Button>
+                    <Button
+                      variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                      className="rounded-sm border border-blue-600 bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                      onClick={() => setPaymentMethod('card')}
+                    >
+                      Card
+                    </Button>
+                  </div>
+
+                  <Button
+                    className="mt-3 w-full rounded-sm border border-emerald-600 bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                    onClick={checkout}
+                    disabled={checkingOut}
+                  >
+                    {checkingOut ? 'Processing…' : 'Checkout'}
+                  </Button>
+                </div>
+              )}
+            </aside>
+
+            {lowStock.length > 0 && (
+              <section className="rounded-md border border-amber-700/40 bg-amber-950/40 p-6 lg:col-span-2">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-amber-50">Heads up: Low stock</h2>
+                  <span className="rounded-sm bg-amber-700 px-2 py-1 text-xs font-semibold text-amber-50">{lowStock.length}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {lowStock.map((item) => (
+                    <div key={item.id} className="rounded-sm border border-amber-700/50 bg-amber-900/30 p-4">
+                      <p className="text-sm font-semibold text-amber-50">{item.name}</p>
+                      <p className="text-xs text-amber-200/80">SKU: {item.sku}</p>
+                      <p className="text-xs text-amber-200/80">Stock: {item.stock}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      </div>
+    </ProtectedRoute>
+  )
+}
