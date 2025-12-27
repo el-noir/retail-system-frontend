@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -38,6 +39,7 @@ import {
 } from '@/lib/api/suppliers'
 
 export default function SuppliersPage() {
+  const router = useRouter()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -155,12 +157,20 @@ export default function SuppliersPage() {
               </TableHeader>
               <TableBody>
                 {suppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
+                  <TableRow key={supplier.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/dashboard/suppliers/${supplier.id}`)}>
                     <TableCell className="font-medium">{supplier.name}</TableCell>
                     <TableCell>{supplier.email || '-'}</TableCell>
                     <TableCell>{supplier.phone || '-'}</TableCell>
                     <TableCell>{supplier.address || '-'}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/dashboard/suppliers/${supplier.id}`)}
+                        className="mr-2"
+                      >
+                        View
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

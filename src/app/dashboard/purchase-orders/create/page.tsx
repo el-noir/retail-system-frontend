@@ -57,9 +57,25 @@ export default function CreatePurchaseOrderPage() {
         getSuppliers(),
         getProducts(),
       ])
-      setSuppliers(suppliersRes.suppliers || [])
-      setProducts(productsRes.products || [])
+      console.log('Suppliers response:', suppliersRes)
+      console.log('Products response:', productsRes)
+      
+      // Handle suppliers response
+      const suppliersList = Array.isArray(suppliersRes) 
+        ? suppliersRes 
+        : (suppliersRes?.suppliers || [])
+      setSuppliers(suppliersList)
+      
+      // Handle products response - backend returns 'items' not 'products'
+      const productsList = Array.isArray(productsRes) 
+        ? productsRes 
+        : (productsRes?.items || productsRes?.products || [])
+      setProducts(productsList)
+      
+      console.log('Set suppliers:', suppliersList.length)
+      console.log('Set products:', productsList.length)
     } catch (error: any) {
+      console.error('Failed to load data:', error)
       toast.error('Failed to load data')
     }
   }
@@ -158,7 +174,7 @@ export default function CreatePurchaseOrderPage() {
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier) => (
+                  {Array.isArray(suppliers) && suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}
                     </SelectItem>
@@ -181,7 +197,7 @@ export default function CreatePurchaseOrderPage() {
                       <SelectValue placeholder="Select product" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product) => (
+                      {Array.isArray(products) && products.map((product) => (
                         <SelectItem key={product.id} value={product.id.toString()}>
                           {product.name} ({product.sku})
                         </SelectItem>
