@@ -16,12 +16,12 @@ export type Product = {
   updatedAt: string
 }
 
-export async function getProducts(limit: number = 10, offset: number = 0) {
+export async function getProducts(limit: number = 1000, offset: number = 0) {
   const data = await apiFetch(`/products?limit=${limit}&offset=${offset}`, {
     method: 'GET',
   })
-  // Backend returns { items, pagination }. Keep backward compatibility by returning items.
-  return (data?.items ?? data) as Product[]
+  // Backend returns { products, pagination }
+  return data
 }
 
 export async function getProductById(id: number) {

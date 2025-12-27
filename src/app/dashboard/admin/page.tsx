@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import AdminSidebar from '@/components/AdminSidebar'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { ProductModal } from '@/components/ProductModal'
+import { ProcurementOverview } from '@/components/ProcurementOverview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getCategories, type Category } from '@/lib/api/categories'
@@ -239,7 +240,12 @@ export default function AdminDashboardPage() {
             {isLoading ? (
               <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading dashboard...</div>
             ) : (
-              <section id="products-section" className="space-y-4">
+              <>
+                {/* Procurement Overview Section */}
+                <ProcurementOverview />
+
+                {/* Products Section */}
+                <section id="products-section" className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-white">Products</h2>
                   {!isAdminOrManager && <p className="text-sm text-slate-400">View only — admin access required to edit</p>}
@@ -354,6 +360,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               </section>
+              </>
             )}
 
             {lowStock.length > 0 && (

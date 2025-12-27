@@ -51,6 +51,14 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
       ],
     },
     {
+      label: 'PROCUREMENT',
+      icon: <Package className="h-4 w-4" />,
+      items: [
+        { label: 'Purchase Orders', icon: <Package className="h-4 w-4" />, href: '/dashboard/purchase-orders' },
+        { label: 'Suppliers', icon: <User className="h-4 w-4" />, href: '/dashboard/suppliers' },
+      ],
+    },
+    {
       label: 'SALES',
       items: [
         { label: 'Transactions', icon: <BarChart3 className="h-4 w-4" /> },
