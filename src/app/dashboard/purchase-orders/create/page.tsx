@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { getSuppliers, type Supplier } from '@/lib/api/suppliers'
+import { getSuppliers, type Supplier, getSupplierProducts, type SupplierProduct } from '@/lib/api/suppliers'
 import { getProducts, type Product } from '@/lib/api/products'
 import {
   createPurchaseOrder,
@@ -39,6 +39,7 @@ export default function CreatePurchaseOrderPage() {
   const router = useRouter()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([])
   const [supplierId, setSupplierId] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<OrderItem[]>([])
@@ -48,35 +49,49 @@ export default function CreatePurchaseOrderPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    loadData()
+    loadSuppliers()
   }, [])
 
-  const loadData = async () => {
+  // Load supplier's products when supplier is selected
+  useEffect(() => {
+    if (supplierId) {
+      loadSupplierProducts()
+    } else {
+      setProducts([])
+      setSupplierProducts([])
+    }
+  }, [supplierId])
+
+  const loadSuppliers = async () => {
     try {
-      const [suppliersRes, productsRes] = await Promise.all([
-        getSuppliers(),
-        getProducts(),
-      ])
-      console.log('Suppliers response:', suppliersRes)
-      console.log('Products response:', productsRes)
-      
-      // Handle suppliers response
+      const suppliersRes = await getSuppliers()
       const suppliersList = Array.isArray(suppliersRes) 
         ? suppliersRes 
         : (suppliersRes?.suppliers || [])
       setSuppliers(suppliersList)
-      
-      // Handle products response - backend returns 'items' not 'products'
-      const productsList = Array.isArray(productsRes) 
-        ? productsRes 
-        : (productsRes?.items || productsRes?.products || [])
-      setProducts(productsList)
-      
-      console.log('Set suppliers:', suppliersList.length)
-      console.log('Set products:', productsList.length)
     } catch (error: any) {
-      console.error('Failed to load data:', error)
-      toast.error('Failed to load data')
+      console.error('Failed to load suppliers:', error)
+      toast.error('Failed to load suppliers')
+    }
+  }
+
+  const loadSupplierProducts = async () => {
+    try {
+      const supplierProductsRes = await getSupplierProducts(supplierId)
+      setSupplierProducts(supplierProductsRes || [])
+      
+      // Extract product info from supplier products (only available products)
+      const availableProducts = supplierProductsRes
+        .filter((sp: SupplierProduct) => sp.isAvailable && sp.product)
+        .map((sp: SupplierProduct) => sp.product) as Product[]
+      
+      setProducts(availableProducts)
+      console.log('Loaded products for supplier:', availableProducts.length)
+    } catch (error: any) {
+      console.error('Failed to load supplier products:', error)
+      toast.error('Failed to load products for this supplier')
+      setProducts([])
+      setSupplierProducts([])
     }
   }
 
@@ -109,6 +124,17 @@ export default function CreatePurchaseOrderPage() {
     setSelectedProductId(null)
     setQuantity(1)
     setUnitPrice(0)
+  }
+
+  const handleProductSelect = (productId: string) => {
+    const id = parseInt(productId)
+    setSelectedProductId(id)
+    
+    // Auto-fill supplier price
+    const supplierProduct = supplierProducts.find(sp => sp.productId === id)
+    if (supplierProduct && supplierProduct.supplierPrice) {
+      setUnitPrice(Number(supplierProduct.supplierPrice))
+    }
   }
 
   const handleRemoveItem = (productId: number) => {
@@ -186,15 +212,26 @@ export default function CreatePurchaseOrderPage() {
             {/* Add Items Section */}
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Items</h3>
+              {!supplierId && (
+                <p className="text-sm text-amber-600">
+                  Please select a supplier first to see available products
+                </p>
+              )}
+              {supplierId && products.length === 0 && (
+                <p className="text-sm text-amber-600">
+                  This supplier has no products configured. Please add products to the supplier's catalog first.
+                </p>
+              )}
               <div className="grid grid-cols-4 gap-4">
                 <div className="col-span-2">
                   <Label>Product *</Label>
                   <Select
                     value={selectedProductId?.toString() || ''}
-                    onValueChange={(v) => setSelectedProductId(parseInt(v))}
+                    onValueChange={handleProductSelect}
+                    disabled={!supplierId || products.length === 0}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select product" />
+                      <SelectValue placeholder={supplierId ? "Select product" : "Select supplier first"} />
                     </SelectTrigger>
                     <SelectContent>
                       {Array.isArray(products) && products.map((product) => (

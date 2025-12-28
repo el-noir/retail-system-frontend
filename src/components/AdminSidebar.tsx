@@ -67,6 +67,17 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
       ],
     },
     {
+      label: 'ANALYTICS',
+      icon: <BarChart3 className="h-4 w-4" />,
+      items: [
+        { label: 'Dashboard Overview', icon: <Home className="h-4 w-4" />, href: '/dashboard/analytics' },
+        { label: 'Sales Analytics', icon: <BarChart3 className="h-4 w-4" />, href: '/dashboard/analytics/sales' },
+        { label: 'Purchase Analytics', icon: <Package className="h-4 w-4" />, href: '/dashboard/analytics/purchases' },
+        { label: 'Inventory Analytics', icon: <Layers className="h-4 w-4" />, href: '/dashboard/analytics/inventory' },
+        { label: 'Profit Analytics', icon: <BarChart3 className="h-4 w-4" />, href: '/dashboard/analytics/profit' },
+      ],
+    },
+    {
       label: 'SETTINGS',
       icon: <Settings className="h-4 w-4" />,
       items: [

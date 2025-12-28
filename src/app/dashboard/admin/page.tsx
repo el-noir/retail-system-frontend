@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Edit2, Trash2 } from 'lucide-react'
+import { Edit2, Trash2, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import AdminSidebar from '@/components/AdminSidebar'
@@ -241,6 +241,27 @@ export default function AdminDashboardPage() {
               <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading dashboard...</div>
             ) : (
               <>
+                {/* Analytics Quick Access Card */}
+                <section className="rounded-lg border border-blue-600/50 bg-gradient-to-br from-blue-900/30 to-slate-900/50 p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600">
+                        <BarChart3 className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Analytics & Reports</h3>
+                        <p className="text-sm text-slate-300">View comprehensive sales, purchases, inventory and profit analytics</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => router.push('/dashboard/analytics')}
+                      className="rounded-sm border border-blue-600 bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      View Analytics
+                    </Button>
+                  </div>
+                </section>
+
                 {/* Procurement Overview Section */}
                 <ProcurementOverview />
 
@@ -308,6 +329,15 @@ export default function AdminDashboardPage() {
                             <td className="px-4 py-3 align-middle text-right font-mono text-emerald-300">${formatPrice(product.price)}</td>
                             <td className="px-4 py-3 align-middle text-right">
                               <div className="inline-flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => router.push(`/dashboard/analytics/product/${product.id}`)}
+                                  className="h-8 rounded-sm border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 hover:border-emerald-400"
+                                  title="View Product Report"
+                                >
+                                  Report
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"

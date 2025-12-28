@@ -48,7 +48,9 @@ export default function CashierDashboardPage() {
       try {
         setIsLoading(true)
         const productsData = await getProducts(100, 0)
-        setProducts(productsData)
+        // Handle response structure - backend returns { items, pagination } or { products, pagination }
+        const productsList = Array.isArray(productsData) ? productsData : (productsData?.items || productsData?.products || [])
+        setProducts(productsList)
 
         try {
           const low = await getLowStockProducts(10, 10, 0)
@@ -58,6 +60,7 @@ export default function CashierDashboardPage() {
         }
       } catch (error: any) {
         toast.error(error?.message || 'Failed to load products')
+        setProducts([]) // Ensure products is always an array even on error
       } finally {
         setIsLoading(false)
       }
@@ -119,6 +122,8 @@ export default function CashierDashboardPage() {
   const debouncedSearch = useDebounce(search, 300)
 
   const filteredProducts = React.useMemo(() => {
+    // Ensure products is always an array
+    if (!Array.isArray(products)) return []
     const q = debouncedSearch.trim().toLowerCase()
     if (!q) return products
     return products.filter((p) =>
