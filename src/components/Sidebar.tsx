@@ -12,7 +12,7 @@ const navItems: { title: string; meta: string }[] = [
 
 export default function Sidebar() {
   return (
-    <aside className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_14px_70px_-24px_rgba(0,0,0,0.85)]">
+    <aside className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-[0_14px_70px_-24px_rgba(0,0,0,0.85)]">
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500" />
         <div>
@@ -25,7 +25,7 @@ export default function Sidebar() {
           <Button
             key={title}
             variant="ghost"
-            className="flex w-full items-center justify-between rounded-2xl border border-transparent px-3 py-2 text-left text-white transition hover:border-white/10 hover:bg-white/5"
+            className="flex w-full items-center justify-between rounded-2xl border border-transparent px-3 py-2 text-left text-white transition hover:border-slate-700 hover:bg-slate-800/50"
           >
             <div className="text-left">
               <p className="font-medium text-white">{title}</p>

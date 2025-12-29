@@ -7,12 +7,14 @@ import { toast } from 'sonner'
 import AdminSidebar from '@/components/AdminSidebar'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { ProductModal } from '@/components/ProductModal'
+import { ProductFiltersComponent, type ProductCategory } from '@/components/ProductFilters'
 import { ProcurementOverview } from '@/components/ProcurementOverview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getCategories, type Category } from '@/lib/api/categories'
 import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
-import { deleteProduct, getProductsPage, type Product } from '@/lib/api/products'
+import { deleteProduct, getProductsPage, getAllProductCategories, type Product, type ProductFilters } from '@/lib/api/products'
+import { getDashboardSummary, type DashboardSummary } from '@/lib/api/analytics'
 import { stockIn, stockOut } from '@/lib/api/stock'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -24,13 +26,15 @@ export default function AdminDashboardPage() {
 
   const [products, setProducts] = React.useState<Product[]>([])
   const [categories, setCategories] = React.useState<Category[]>([])
+  const [productCategories, setProductCategories] = React.useState<ProductCategory[]>([])
   const [lowStock, setLowStock] = React.useState<LowStockProduct[]>([])
+  const [dashboardSummary, setDashboardSummary] = React.useState<DashboardSummary | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [limit, setLimit] = React.useState(10)
   const [page, setPage] = React.useState(1)
   const [total, setTotal] = React.useState(0)
   const [pages, setPages] = React.useState(1)
-  const [search, setSearch] = React.useState('')
+  const [filters, setFilters] = React.useState<ProductFilters>({})
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [selectedProduct, setSelectedProduct] = React.useState<Product | undefined>()
   const [isDeleting, setIsDeleting] = React.useState<number | null>(null)
@@ -63,23 +67,32 @@ export default function AdminDashboardPage() {
       try {
         setIsLoading(true)
         const offset = (page - 1) * limit
-        const pageData = await getProductsPage(limit, offset)
+        
+        // Fetch all data in parallel
+        const [
+          pageData,
+          categoriesData,
+          productCategoriesData,
+          dashboardData
+        ] = await Promise.all([
+          getProductsPage(limit, offset, filters),
+          getCategories(100, 0),
+          getAllProductCategories(),
+          getDashboardSummary()
+        ])
+        
         setProducts(pageData.items)
         setTotal(pageData.pagination.total)
         setPages(pageData.pagination.pages)
+        setCategories(categoriesData)
+        setProductCategories(productCategoriesData)
+        setDashboardSummary(dashboardData)
 
         try {
           const low = await getLowStockProducts(10, 10, 0)
           setLowStock(low.products)
         } catch (error) {
           console.warn('Failed to fetch low stock list', error)
-        }
-
-        try {
-          const categoriesData = await getCategories(100, 0)
-          setCategories(categoriesData)
-        } catch (error) {
-          console.warn('Failed to fetch categories from API:', error)
         }
       } catch (error: any) {
         toast.error(error?.message || 'Failed to load dashboard data')
@@ -89,7 +102,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchData()
-  }, [limit, page])
+  }, [limit, page, filters])
 
   const handleAddClick = () => {
     setSelectedProduct(undefined)
@@ -172,17 +185,10 @@ export default function AdminDashboardPage() {
     return { label: 'In Stock', className: 'bg-emerald-900/30 text-emerald-100 border-emerald-700' }
   }
 
-  const debouncedSearch = useDebounce(search, 300)
-
-  const filteredProducts = React.useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase()
-    if (!q) return products
-    return products.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.sku?.toLowerCase().includes(q)) ||
-      (p.category?.name?.toLowerCase().includes(q))
-    )
-  }, [products, debouncedSearch])
+  const handleFiltersChange = (newFilters: ProductFilters) => {
+    setFilters(newFilters)
+    setPage(1) // Reset to first page when filters change
+  }
 
   return (
     <ProtectedRoute>
@@ -213,27 +219,23 @@ export default function AdminDashboardPage() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
-                  <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">{products.length}</div>
+                  <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">
+                    {isLoading ? '-' : (dashboardSummary?.totalProducts ?? total)}
+                  </div>
                   <div>
                     <p className="text-xs font-medium text-slate-400">Total products</p>
                     <p className="text-sm font-medium text-white">Updated live</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-md border border-amber-600/50 bg-amber-900/30 px-4 py-3">
-                  <div className="flex h-10 w-10 items-center justify-center bg-amber-500 text-sm font-semibold text-slate-950">{lowStock.length}</div>
+                  <div className="flex h-10 w-10 items-center justify-center bg-amber-500 text-sm font-semibold text-slate-950">
+                    {isLoading ? '-' : (dashboardSummary?.lowStockCount ?? lowStock.length)}
+                  </div>
                   <div>
                     <p className="text-xs font-medium text-amber-200/80">Low stock</p>
                     <p className="text-sm font-medium text-amber-50">Threshold &lt;= 10</p>
                   </div>
                 </div>
-                {isAdminOrManager && (
-                  <Button
-                    onClick={handleAddClick}
-                    className="rounded-sm border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                  >
-                    Add product
-                  </Button>
-                )}
               </div>
             </header>
 
@@ -266,35 +268,45 @@ export default function AdminDashboardPage() {
                 <ProcurementOverview />
 
                 {/* Products Section */}
-                <section id="products-section" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-white">Products</h2>
-                  {!isAdminOrManager && <p className="text-sm text-slate-400">View only — admin access required to edit</p>}
-                </div>
+                <section id="products-section" className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">Products</h2>
+                    {!isAdminOrManager && <p className="text-sm text-slate-400">View only — admin access required to edit</p>}
+                  </div>
 
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Search products, SKU or category"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-80 rounded-sm border-slate-700 bg-slate-900 text-slate-100"
-                    />
+                  {/* Product Filters */}
+                  <ProductFiltersComponent
+                    filters={filters}
+                    onFiltersChange={handleFiltersChange}
+                    categories={productCategories}
+                    isLoading={isLoading}
+                    totalProducts={total}
+                  />
+
+                  {/* Controls */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <span>Show</span>
+                      <select
+                        className="rounded-sm border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
+                        value={limit}
+                        onChange={(e) => { setPage(1); setLimit(parseInt(e.target.value, 10)) }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+                    {isAdminOrManager && (
+                      <Button
+                        onClick={handleAddClick}
+                        className="rounded-sm border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Add product
+                      </Button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-300">
-                    <span>Show</span>
-                    <select
-                      className="rounded-sm border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
-                      value={limit}
-                      onChange={(e) => { setPage(1); setLimit(parseInt(e.target.value, 10)) }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                    <span>per page</span>
-                  </div>
-                </div>
 
                 <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-900">
                   <table className="w-full text-sm">
@@ -309,7 +321,7 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProducts.map((product, idx) => {
+                      {products.map((product, idx) => {
                         const status = stockStatus(product.stock)
                         return (
                           <tr key={product.id} className={idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-950'}>

@@ -172,11 +172,11 @@ export function ProductForm({ product, categories, onSuccess, onCancel }: Produc
                   {...field}
                   onChange={(e) => field.onChange(parseInt(e.target.value))}
                   disabled={isSubmitting}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-slate-100 placeholder-slate-500 transition focus:border-emerald-400/40 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 transition focus:border-emerald-400/40 focus:outline-none focus:bg-slate-700"
                 >
-                  <option value="">Select a category</option>
+                  <option value="" className="bg-slate-800 text-slate-100">Select a category</option>
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
+                    <option key={cat.id} value={cat.id} className="bg-slate-800 text-slate-100">
                       {cat.name}
                     </option>
                   ))}

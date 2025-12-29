@@ -21,8 +21,10 @@ export function ProcurementOverview() {
           getPurchaseOrders(),
           getSuppliers(),
         ])
-        setOrders(Array.isArray(ordersData) ? ordersData : [])
-        setSuppliers(Array.isArray(suppliersData) ? suppliersData : [])
+        
+        // Handle structured responses from backend
+        setOrders(ordersData?.orders || [])
+        setSuppliers(suppliersData?.suppliers || [])
       } catch (error) {
         console.error('Failed to fetch procurement data:', error)
         setOrders([])

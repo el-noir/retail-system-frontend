@@ -4,11 +4,13 @@ import React from 'react'
 import { toast } from 'sonner'
 
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { ProductFiltersComponent, type ProductCategory } from '@/components/ProductFilters'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getLowStockProducts, type LowStockProduct } from '@/lib/api/inventory'
-import { getProducts, type Product } from '@/lib/api/products'
+import { getProducts, getAllProductCategories, type Product, type ProductFilters } from '@/lib/api/products'
 import { createSale, type CreateSalePayload } from '@/lib/api/sales'
+import { getDashboardSummary, type DashboardSummary } from '@/lib/api/analytics'
 import { useAuth } from '@/lib/auth/auth-context'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { useDebouncedCallback } from '@/lib/hooks/useDebouncedCallback'
@@ -21,10 +23,12 @@ type CartItem = {
 export default function CashierDashboardPage() {
   const { token } = useAuth()
   const [products, setProducts] = React.useState<Product[]>([])
+  const [productCategories, setProductCategories] = React.useState<ProductCategory[]>([])
   const [lowStock, setLowStock] = React.useState<LowStockProduct[]>([])
+  const [dashboardSummary, setDashboardSummary] = React.useState<DashboardSummary | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [cart, setCart] = React.useState<CartItem[]>([])
-  const [search, setSearch] = React.useState('')
+  const [filters, setFilters] = React.useState<ProductFilters>({})
   const [customerName, setCustomerName] = React.useState('')
   const [customerPhone, setCustomerPhone] = React.useState('')
   const [paymentMethod, setPaymentMethod] = React.useState<'cash' | 'card'>('cash')
@@ -47,16 +51,30 @@ export default function CashierDashboardPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        const productsData = await getProducts(100, 0)
+        
+        // Fetch data in parallel
+        const [productsData, dashboardData] = await Promise.all([
+          getProducts(100, 0, filters),
+          getDashboardSummary().catch(() => null) // Don't fail if dashboard summary is unavailable
+        ])
+        
         // Handle response structure - backend returns { items, pagination } or { products, pagination }
         const productsList = Array.isArray(productsData) ? productsData : (productsData?.items || productsData?.products || [])
         setProducts(productsList)
+        setDashboardSummary(dashboardData)
 
         try {
           const low = await getLowStockProducts(10, 10, 0)
           setLowStock(low.products)
         } catch (error) {
           console.warn('Failed to fetch low stock list', error)
+        }
+
+        try {
+          const productCategoriesData = await getAllProductCategories()
+          setProductCategories(productCategoriesData)
+        } catch (error) {
+          console.warn('Failed to fetch product categories:', error)
         }
       } catch (error: any) {
         toast.error(error?.message || 'Failed to load products')
@@ -67,7 +85,7 @@ export default function CashierDashboardPage() {
     }
 
     fetchData()
-  }, [])
+  }, [filters])
 
   const formatPrice = (value: unknown) => {
     const num = typeof value === 'number' ? value : parseFloat(String(value))
@@ -119,19 +137,14 @@ export default function CashierDashboardPage() {
   const subtotal = cart.reduce((sum, ci) => sum + Number(ci.product.price) * ci.quantity, 0)
   const total = subtotal + (taxAmount || 0) - (discountAmount || 0)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = useDebounce('', 300) // Remove search since it's handled by filters
 
-  const filteredProducts = React.useMemo(() => {
-    // Ensure products is always an array
-    if (!Array.isArray(products)) return []
-    const q = debouncedSearch.trim().toLowerCase()
-    if (!q) return products
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.sku?.toLowerCase().includes(q)) ||
-      (p.category?.name?.toLowerCase().includes(q))
-    )
-  }, [products, debouncedSearch])
+  const handleFiltersChange = (newFilters: ProductFilters) => {
+    setFilters(newFilters)
+  }
+
+  // No need for client-side filtering since it's handled by the server
+  // const filteredProducts = products
 
   const checkout = async () => {
     if (cart.length === 0) {
@@ -182,7 +195,9 @@ export default function CashierDashboardPage() {
               <p className="text-sm text-slate-300">Role: {role}</p>
             </div>
             <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
-              <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">{products.length}</div>
+              <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">
+                {isLoading ? '-' : (dashboardSummary?.totalProducts ?? products.length)}
+              </div>
               <div>
                 <p className="text-xs font-medium text-slate-400">Products available</p>
                 <p className="text-sm font-medium text-white">Ready to sell</p>
@@ -206,17 +221,15 @@ export default function CashierDashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Input
-                    placeholder="Search products, SKU or category"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full sm:w-96 rounded-sm border-slate-700 bg-slate-900 text-slate-100"
-                  />
-                  <div className="text-sm text-slate-400">
-                    Showing {filteredProducts.length} of {products.length}
-                  </div>
-                </div>
+                {/* Product Filters */}
+                <ProductFiltersComponent
+                  filters={filters}
+                  onFiltersChange={handleFiltersChange}
+                  categories={productCategories}
+                  isLoading={isLoading}
+                  totalProducts={dashboardSummary?.totalProducts ?? products.length}
+                  className="my-4"
+                />
 
                 <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-900">
                   <table className="w-full text-sm">
@@ -231,7 +244,7 @@ export default function CashierDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProducts.map((product, idx) => {
+                      {products.map((product, idx) => {
                         const status = stockStatus(product.stock)
                         const isOut = product.stock === 0
                         return (
@@ -263,7 +276,7 @@ export default function CashierDashboardPage() {
                           </tr>
                         )
                       })}
-                      {filteredProducts.length === 0 && (
+                      {products.length === 0 && (
                         <tr>
                           <td className="px-4 py-6 text-center text-slate-400" colSpan={6}>
                             No products match your search.
