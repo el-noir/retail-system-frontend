@@ -1,8 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Eye, Edit2, Trash2, BarChart3 } from 'lucide-react'
-import { toast } from 'sonner'
+import { Eye, Edit2, Trash2, BarChart3, Package } from 'lucide-react'
 
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { ProductFiltersComponent, type ProductCategory } from '@/components/ProductFilters'
@@ -15,10 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { DataTable, type Column, type BulkAction } from '@/components/DataTable'
+import { SearchAndFilter, type FilterOption, type SortOption } from '@/components/SearchAndFilter'
+import { useToast } from '@/components/Toast'
 import {
   getAllProductCategories,
   getProductsPage,
   getCategorySummary,
+  deleteProduct,
   type Product,
   type ProductFilters,
 } from '@/lib/api/products'
@@ -26,10 +29,16 @@ import { useAuth } from '@/lib/auth/auth-context'
 
 export default function ProductsPage() {
   const { token } = useAuth()
+  const { toast } = useToast()
+  
   const [products, setProducts] = React.useState<Product[]>([])
   const [productCategories, setProductCategories] = React.useState<ProductCategory[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [filters, setFilters] = React.useState<ProductFilters>({})
+  const [searchQuery, setSearchQuery] = React.useState('')
+  const [sortBy, setSortBy] = React.useState<string>('')
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc')
+  
   const [pagination, setPagination] = React.useState({
     total: 0,
     limit: 20,
@@ -53,13 +62,22 @@ export default function ProductsPage() {
     }
   }, [token])
 
+  const canEdit = userInfo?.role === 'ADMIN' || userInfo?.role === 'MANAGER'
+
+  // Data fetching
   React.useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true)
         
+        // Combine search and filters
+        const searchFilters = {
+          ...filters,
+          ...(searchQuery && { name: searchQuery }),
+        }
+        
         const [productsData, categoriesData] = await Promise.all([
-          getProductsPage(pagination.limit, pagination.offset, filters),
+          getProductsPage(pagination.limit, pagination.offset, searchFilters),
           getAllProductCategories(),
         ])
 
@@ -67,14 +85,14 @@ export default function ProductsPage() {
         setPagination(productsData.pagination)
         setProductCategories(categoriesData)
       } catch (error: any) {
-        toast.error(error?.message || 'Failed to load products')
+        toast.error('Failed to load products', error?.message || 'Unknown error occurred')
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchData()
-  }, [pagination.limit, pagination.offset, filters])
+  }, [pagination.limit, pagination.offset, filters, searchQuery, sortBy, sortDirection])
 
   React.useEffect(() => {
     // Fetch category summary when a specific category is selected
@@ -87,30 +105,166 @@ export default function ProductsPage() {
     }
   }, [filters.categoryId])
 
-  const handleFiltersChange = (newFilters: ProductFilters) => {
-    setFilters(newFilters)
-    setPagination(prev => ({ ...prev, offset: 0, currentPage: 1 }))
-  }
+  // Handlers
+  const handleSearch = React.useCallback((query: string) => {
+    setSearchQuery(query)
+    setPagination(prev => ({ ...prev, currentPage: 1, offset: 0 }))
+  }, [])
 
-  const handlePageChange = (newPage: number) => {
-    const newOffset = (newPage - 1) * pagination.limit
-    setPagination(prev => ({ ...prev, offset: newOffset, currentPage: newPage }))
-  }
+  const handleFilter = React.useCallback((newFilters: Record<string, any>) => {
+    setFilters(newFilters as ProductFilters)
+    setPagination(prev => ({ ...prev, currentPage: 1, offset: 0 }))
+  }, [])
 
-  const handleLimitChange = (newLimit: number) => {
-    setPagination(prev => ({ ...prev, limit: newLimit, offset: 0, currentPage: 1 }))
-  }
+  const handleSort = React.useCallback((column: string, direction: 'asc' | 'desc') => {
+    setSortBy(column)
+    setSortDirection(direction)
+  }, [])
 
-  const formatPrice = (value: unknown) => {
-    const num = typeof value === 'number' ? value : parseFloat(String(value))
-    return isNaN(num) ? '0.00' : num.toFixed(2)
-  }
+  const handlePageChange = React.useCallback((page: number) => {
+    setPagination(prev => ({
+      ...prev,
+      currentPage: page,
+      offset: (page - 1) * prev.limit,
+    }))
+  }, [])
+  // Bulk actions
+  const handleBulkDelete = React.useCallback(async (selectedProducts: Product[]) => {
+    try {
+      await Promise.all(selectedProducts.map(product => deleteProduct(product.id)))
+      
+      // Refresh data
+      const searchFilters = {
+        ...filters,
+        ...(searchQuery && { name: searchQuery }),
+      }
+      
+      const productsData = await getProductsPage(
+        pagination.limit, 
+        pagination.offset, 
+        searchFilters
+      )
+      
+      setProducts(productsData.items)
+      setPagination(productsData.pagination)
+      
+      toast.success('Products deleted successfully', `Deleted ${selectedProducts.length} products`)
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to delete products')
+    }
+  }, [filters, searchQuery, pagination.limit, pagination.offset])
 
-  const stockStatus = (stock: number) => {
-    if (stock === 0) return { label: 'Out of Stock', variant: 'destructive' as const }
-    if (stock <= 10) return { label: 'Low Stock', variant: 'outline' as const }
-    return { label: 'In Stock', variant: 'default' as const }
-  }
+  // Table configuration
+  const columns: Column<Product>[] = [
+    {
+      key: 'name',
+      title: 'Product',
+      sortable: true,
+      render: (_, product) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-white">{product.name}</p>
+          <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      title: 'Category',
+      sortable: true,
+      render: (_, product) => product.category?.name ?? 'Uncategorized',
+    },
+    {
+      key: 'stock',
+      title: 'Stock',
+      sortable: true,
+      align: 'right',
+      render: (stock) => (
+        <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-100">
+          {stock}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (_, product) => {
+        const stock = product.stock
+        const status = stock === 0 
+          ? { label: 'Out of Stock', variant: 'destructive' as const }
+          : stock <= 10 
+          ? { label: 'Low Stock', variant: 'outline' as const }
+          : { label: 'In Stock', variant: 'default' as const }
+        
+        return <Badge variant={status.variant}>{status.label}</Badge>
+      },
+    },
+    {
+      key: 'price',
+      title: 'Price',
+      sortable: true,
+      align: 'right',
+      render: (price) => (
+        <span className="font-mono text-emerald-300">
+          ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
+        </span>
+      ),
+    },
+  ]
+
+  const bulkActions: BulkAction<Product>[] = canEdit ? [
+    {
+      key: 'delete',
+      label: 'Delete Selected',
+      icon: <Trash2 className="h-4 w-4" />,
+      variant: 'destructive',
+      action: handleBulkDelete,
+      confirmMessage: 'Are you sure you want to delete the selected products? This action cannot be undone.',
+    },
+  ] : []
+
+  const filterOptions: FilterOption[] = [
+    {
+      key: 'categoryId',
+      label: 'Category',
+      type: 'select',
+      options: productCategories.map(cat => ({
+        value: cat.id.toString(),
+        label: cat.name,
+      })),
+      placeholder: 'Select category',
+    },
+    {
+      key: 'minStock',
+      label: 'Minimum Stock',
+      type: 'number',
+      placeholder: '0',
+    },
+    {
+      key: 'maxStock',
+      label: 'Maximum Stock',
+      type: 'number',
+      placeholder: '1000',
+    },
+    {
+      key: 'minPrice',
+      label: 'Minimum Price',
+      type: 'number',
+      placeholder: '0.00',
+    },
+    {
+      key: 'maxPrice',
+      label: 'Maximum Price',
+      type: 'number',
+      placeholder: '999.99',
+    },
+  ]
+
+  const sortOptions: SortOption[] = [
+    { key: 'name', label: 'Name' },
+    { key: 'stock', label: 'Stock' },
+    { key: 'price', label: 'Price' },
+    { key: 'createdAt', label: 'Date Added' },
+  ]
 
   return (
     <ProtectedRoute>
@@ -157,177 +311,52 @@ export default function ProductsPage() {
             </Card>
           )}
 
-          {/* Product Filters */}
-          <div className="mb-6">
-            <ProductFiltersComponent
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              categories={productCategories}
-              isLoading={isLoading}
-              totalProducts={pagination.total}
-            />
-          </div>
+          {/* Search and Filter */}
+          <SearchAndFilter
+            onSearch={handleSearch}
+            onFilter={handleFilter}
+            onSort={handleSort}
+            filterOptions={filterOptions}
+            sortOptions={sortOptions}
+            placeholder="Search products by name..."
+            className="mb-6"
+          />
 
-          {/* Controls */}
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              <span>Show</span>
-              <select
-                className="rounded-sm border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
-                value={pagination.limit}
-                onChange={(e) => handleLimitChange(parseInt(e.target.value, 10))}
-                disabled={isLoading}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-              <span>per page</span>
-            </div>
-            
-            <div className="text-sm text-slate-400">
-              Page {pagination.currentPage} of {pagination.pages} ({pagination.total} total)
-            </div>
-          </div>
-
-          {/* Products Table */}
-          {isLoading ? (
-            <div className="rounded-md border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading products...</div>
-          ) : (
-            <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-900">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-3 text-left">Product Name</th>
-                    <th className="px-4 py-3 text-left">Category</th>
-                    <th className="px-4 py-3 text-right">Stock</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-right">Price</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product, idx) => {
-                    const status = stockStatus(product.stock)
-                    return (
-                      <tr key={product.id} className={idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-950'}>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="space-y-1">
-                            <p className="font-semibold text-white">{product.name}</p>
-                            <p className="text-xs text-slate-400">SKU: {product.sku}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-middle text-slate-300">
-                          {product.category?.name ?? 'Uncategorized'}
-                        </td>
-                        <td className="px-4 py-3 align-middle text-right">
-                          <span className="rounded-sm bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-100">
-                            {product.stock}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <Badge variant={status.variant}>{status.label}</Badge>
-                        </td>
-                        <td className="px-4 py-3 align-middle text-right font-mono text-emerald-300">
-                          ${formatPrice(product.price)}
-                        </td>
-                        <td className="px-4 py-3 align-middle text-right">
-                          <div className="inline-flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="View Details"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {(userInfo?.role === 'ADMIN' || userInfo?.role === 'MANAGER') && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="Edit Product"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="View Analytics"
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-
-              {products.length === 0 && (
-                <div className="p-8 text-center text-slate-400">
-                  {Object.keys(filters).length > 0 ? 'No products match your filters' : 'No products found'}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination.pages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-slate-400">
-                Showing {pagination.offset + 1} to {Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total} products
+          {/* Enhanced Data Table */}
+          <DataTable
+            data={products}
+            columns={columns}
+            keyField="id"
+            loading={isLoading}
+            pagination={{
+              currentPage: pagination.currentPage,
+              totalPages: pagination.pages,
+              onPageChange: handlePageChange,
+              pageSize: pagination.limit,
+              totalItems: pagination.total,
+            }}
+            bulkActions={bulkActions}
+            onSort={handleSort}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            emptyState={
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 mx-auto text-slate-400 mb-4" />
+                <h3 className="text-lg font-medium text-slate-300 mb-2">No products found</h3>
+                <p className="text-sm text-slate-400">
+                  {Object.keys(filters).length > 0 || searchQuery
+                    ? 'Try adjusting your search or filters'
+                    : 'Get started by adding your first product'
+                  }
+                </p>
+                {canEdit && (
+                  <Button className="mt-4" onClick={() => console.log('Add product')}>
+                    Add Product
+                  </Button>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.currentPage - 1)}
-                  disabled={pagination.currentPage <= 1 || isLoading}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
-                >
-                  Previous
-                </Button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
-                    const page = i + 1
-                    const isActive = page === pagination.currentPage
-                    return (
-                      <Button
-                        key={page}
-                        variant={isActive ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handlePageChange(page)}
-                        disabled={isLoading}
-                        className={isActive 
-                          ? "bg-emerald-600 hover:bg-emerald-700" 
-                          : "border-slate-700 text-slate-300 hover:bg-slate-800"
-                        }
-                      >
-                        {page}
-                      </Button>
-                    )
-                  })}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.currentPage + 1)}
-                  disabled={pagination.currentPage >= pagination.pages || isLoading}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+            }
+          />
         </div>
       </div>
     </ProtectedRoute>
