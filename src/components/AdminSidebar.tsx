@@ -81,13 +81,13 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block lg:col-span-3 lg:h-fit lg:sticky lg:top-8">
-        <div className="rounded-lg border border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl">
+      <aside className="hidden lg:block lg:col-span-3 xl:col-span-2 lg:h-fit lg:sticky lg:top-8">
+        <div className="rounded-lg border border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 p-4 lg:p-6 shadow-xl">
           {/* Logo/Brand */}
-          <div className="mb-8">
+          <div className="mb-6 lg:mb-8">
             <div className="flex items-center gap-2 px-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
+              <div className="h-7 w-7 lg:h-8 lg:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <Package className="h-4 w-4 lg:h-5 lg:w-5 text-white" />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Store Master</p>
@@ -180,18 +180,19 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
 
       {/* Mobile Header & Toggle */}
       <div className="lg:hidden col-span-1 md:col-span-2">
-        <div className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-900 p-4 shadow-lg">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-              <Package className="h-5 w-5 text-white" />
+        <div className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-900 p-3 sm:p-4 shadow-lg">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
             <div>
               <p className="text-sm font-bold text-white">Store Master</p>
+              <p className="text-xs text-slate-400 hidden sm:block">Admin Panel</p>
             </div>
           </div>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-md p-2 hover:bg-slate-800"
+            className="rounded-md p-2 hover:bg-slate-800 transition-colors"
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -199,9 +200,9 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="mt-3 rounded-lg border border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-lg">
+          <div className="mt-3 rounded-lg border border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 p-4 sm:p-6 shadow-lg">
             {/* Navigation */}
-            <nav className="space-y-3 mb-6">
+            <nav className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
               {sections.map((section) => {
                 const isExpanded = expanded[section.label.toLowerCase()]
                 const isCollapsible = section.items.length > 1 || section.label !== 'MAIN'
@@ -211,7 +212,7 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
                     {isCollapsible && section.label !== 'MAIN' ? (
                       <button
                         onClick={() => toggle(section.label.toLowerCase())}
-                        className="w-full flex items-center justify-between rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-800/60 transition-all"
+                        className="w-full flex items-center justify-between rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-800/60 transition-all touch-manipulation"
                       >
                         <div className="flex items-center gap-2">
                           {section.icon}
@@ -233,7 +234,8 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
                           <Link
                             key={item.label}
                             href={item.href || '#'}
-                            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 transition-all hover:bg-slate-800/60 hover:text-emerald-400"
+                            className="flex items-center gap-3 rounded-md px-3 py-3 text-sm text-slate-300 transition-all hover:bg-slate-800/60 hover:text-emerald-400 touch-manipulation"
+                            onClick={() => setMobileOpen(false)} // Close menu on navigation
                           >
                             {item.icon && <span className="text-slate-400">{item.icon}</span>}
                             <span>{item.label}</span>
@@ -247,13 +249,13 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
             </nav>
 
             {/* Divider */}
-            <div className="my-4 h-px bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800" />
+            <div className="my-3 sm:my-4 h-px bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800" />
 
             {/* User Info */}
             <div className="space-y-3">
-              <div className="rounded-md bg-slate-800/30 p-4 border border-slate-700/50">
+              <div className="rounded-md bg-slate-800/30 p-3 sm:p-4 border border-slate-700/50">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Account</p>
-                <p className="text-sm font-medium text-slate-100">{userEmail ?? 'User'}</p>
+                <p className="text-sm font-medium text-slate-100 break-all">{userEmail ?? 'User'}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-1 text-xs font-bold text-white">
                     {userRole ?? 'UNKNOWN'}
@@ -265,14 +267,14 @@ export default function AdminSidebar({ userEmail, userRole, onSignOut }: AdminSi
               <div className="space-y-2">
                 <Link
                   href="/profile"
-                  className="flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-4 py-2 text-sm font-medium text-slate-200 transition-all hover:border-slate-600 hover:bg-slate-800/60"
+                  className="flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-4 py-3 text-sm font-medium text-slate-200 transition-all hover:border-slate-600 hover:bg-slate-800/60 touch-manipulation"
                 >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </Link>
                 <Button
                   onClick={onSignOut}
-                  className="w-full flex items-center justify-center gap-2 rounded-md border border-red-900/50 bg-red-950/30 px-4 py-2 text-sm font-medium text-red-300 transition-all hover:bg-red-950/60 hover:border-red-700"
+                  className="w-full flex items-center justify-center gap-2 rounded-md border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm font-medium text-red-300 transition-all hover:bg-red-950/60 hover:border-red-700 touch-manipulation"
                 >
                   <LogOut className="h-4 w-4" />
                   <span>Sign out</span>

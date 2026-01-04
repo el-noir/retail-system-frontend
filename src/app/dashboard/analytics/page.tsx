@@ -284,7 +284,7 @@ export default function AnalyticsDashboardPage() {
       )}
 
       {/* Top Products and Suppliers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Top Selling Products */}
         {salesAnalytics && salesAnalytics.topProducts.length > 0 && (
           <Card className="bg-slate-900 border-slate-800">
@@ -293,20 +293,23 @@ export default function AnalyticsDashboardPage() {
               <CardDescription>Best performers by quantity</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={salesAnalytics.topProducts.slice(0, 5)}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
-                    }}
-                  />
-                  <Bar dataKey="quantitySold" fill="#0088FE" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="w-full h-[200px] sm:h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={salesAnalytics.topProducts.slice(0, 5)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #334155',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Bar dataKey="quantitySold" fill="#0088FE" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         )}

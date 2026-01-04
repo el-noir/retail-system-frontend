@@ -60,6 +60,7 @@ export default function CashierDashboardPage() {
         
         // Handle response structure - backend returns { items, pagination } or { products, pagination }
         const productsList = Array.isArray(productsData) ? productsData : (productsData?.items || productsData?.products || [])
+        console.log('Products data structure:', { productsData, productsList })
         setProducts(productsList)
         setDashboardSummary(dashboardData)
 
@@ -77,6 +78,7 @@ export default function CashierDashboardPage() {
           console.warn('Failed to fetch product categories:', error)
         }
       } catch (error: any) {
+        console.error('Failed to load products:', error)
         toast.error(error?.message || 'Failed to load products')
         setProducts([]) // Ensure products is always an array even on error
       } finally {
@@ -172,8 +174,15 @@ export default function CashierDashboardPage() {
       setTaxAmount(0)
       setDiscountAmount(0)
       // Refresh products to get updated stock
-      const updated = await getProducts(100, 0)
-      setProducts(updated)
+      try {
+        const updated = await getProducts(100, 0)
+        const updatedProductsList = Array.isArray(updated) ? updated : (updated?.items || updated?.products || [])
+        console.log('Updated products structure after checkout:', { updated, updatedProductsList })
+        setProducts(updatedProductsList)
+      } catch (refreshError) {
+        console.warn('Failed to refresh products after checkout:', refreshError)
+        // Don't show error to user as checkout was successful
+      }
       // Offer quick access to invoice
       // navigate user to receipt view in new tab
       window.open(`/sales/${sale.invoiceNumber}`, '_blank')
@@ -196,7 +205,7 @@ export default function CashierDashboardPage() {
             </div>
             <div className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="flex h-10 w-10 items-center justify-center bg-emerald-600 text-sm font-semibold text-slate-950">
-                {isLoading ? '-' : (dashboardSummary?.totalProducts ?? products.length)}
+                {isLoading ? '-' : (dashboardSummary?.totalProducts ?? (Array.isArray(products) ? products.length : 0))}
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-400">Products available</p>
@@ -227,7 +236,7 @@ export default function CashierDashboardPage() {
                   onFiltersChange={handleFiltersChange}
                   categories={productCategories}
                   isLoading={isLoading}
-                  totalProducts={dashboardSummary?.totalProducts ?? products.length}
+                  totalProducts={dashboardSummary?.totalProducts ?? (Array.isArray(products) ? products.length : 0)}
                   className="my-4"
                 />
 
@@ -244,7 +253,7 @@ export default function CashierDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {products.map((product, idx) => {
+                      {Array.isArray(products) && products.map((product, idx) => {
                         const status = stockStatus(product.stock)
                         const isOut = product.stock === 0
                         return (
@@ -276,7 +285,7 @@ export default function CashierDashboardPage() {
                           </tr>
                         )
                       })}
-                      {products.length === 0 && (
+                      {(!Array.isArray(products) || products.length === 0) && (
                         <tr>
                           <td className="px-4 py-6 text-center text-slate-400" colSpan={6}>
                             No products match your search.

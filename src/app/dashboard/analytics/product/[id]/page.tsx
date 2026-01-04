@@ -103,7 +103,7 @@ export default function ProductReportPage() {
               </Button>
               <div>
                 <h1 className="text-3xl font-bold text-white">{data.product.name}</h1>
-                <p className="text-sm text-slate-400">SKU: {data.product.sku} • {data.product.category}</p>
+                <p className="text-sm text-slate-400">SKU: {data.product.sku} • {data.product.category?.name || 'Uncategorized'}</p>
               </div>
             </div>
             <Button

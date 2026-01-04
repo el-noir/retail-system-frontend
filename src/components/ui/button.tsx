@@ -21,12 +21,12 @@ const buttonVariants = cva(
         link: "text-emerald-400 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        default: "h-9 px-3 py-2 sm:h-10 sm:px-4 sm:py-2 has-[>svg]:px-2.5 sm:has-[>svg]:px-3",
+        sm: "h-8 rounded-md gap-1.5 px-2.5 sm:px-3 has-[>svg]:px-2 sm:has-[>svg]:px-2.5",
+        lg: "h-10 sm:h-11 rounded-md px-4 sm:px-6 has-[>svg]:px-3 sm:has-[>svg]:px-4",
+        icon: "size-8 sm:size-9",
+        "icon-sm": "size-7 sm:size-8",
+        "icon-lg": "size-9 sm:size-10",
       },
     },
     defaultVariants: {

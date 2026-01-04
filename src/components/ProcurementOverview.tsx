@@ -129,8 +129,7 @@ export function ProcurementOverview() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Pending Approvals */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">{/* Pending Approvals */}
         <div className="rounded-lg border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 p-4 hover:border-slate-700 transition-colors">
           <div className="flex items-start justify-between">
             <div className="flex-1">

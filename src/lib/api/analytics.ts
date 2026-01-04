@@ -153,7 +153,10 @@ export interface ProductAnalytics {
     name: string;
     sku: string;
     description: string | null;
-    category: string;
+    category: {
+      id: number | null;
+      name: string;
+    };
     currentStock: number;
     costPrice: number;
     sellingPrice: number;

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Search, Filter, Package, AlertTriangle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useDebouncedCallback } from '@/lib/hooks/useDebouncedCallback'
 import { ProductFilters } from '@/lib/api/products'
 
 export type ProductCategory = {
@@ -37,9 +38,22 @@ export function ProductFiltersComponent({
   totalProducts,
   className = '',
 }: ProductFiltersComponentProps) {
+  const [localSearchValue, setLocalSearchValue] = useState(filters.search || '')
+
+  // Debounced search function that updates filters after 300ms delay
+  const debouncedSearch = useDebouncedCallback((search: string) => {
+    onFiltersChange({ ...filters, search: search.trim() || undefined })
+  }, 300)
+
   const handleSearchChange = (search: string) => {
-    onFiltersChange({ ...filters, search: search || undefined })
+    setLocalSearchValue(search)
+    debouncedSearch(search)
   }
+
+  // Update local search value when filters change externally (e.g., clear filters)
+  useEffect(() => {
+    setLocalSearchValue(filters.search || '')
+  }, [filters.search])
 
   const handleCategoryChange = (categoryId: string) => {
     onFiltersChange({
@@ -58,6 +72,7 @@ export function ProductFiltersComponent({
   }
 
   const clearFilters = () => {
+    setLocalSearchValue('')
     onFiltersChange({})
   }
 
@@ -78,7 +93,7 @@ export function ProductFiltersComponent({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             placeholder="Search products, SKU, or description..."
-            value={filters.search || ''}
+            value={localSearchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10 bg-slate-900 border-slate-700 text-slate-100"
             disabled={isLoading}

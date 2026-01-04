@@ -203,18 +203,18 @@ export default function AdminDashboardPage() {
         onSuccess={handleProductSuccess}
       />
       <div className="min-h-screen bg-slate-950 text-slate-50">
-        <div className="grid grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-12 lg:px-8 lg:gap-8">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 px-4 py-6 sm:py-8 sm:px-6 lg:grid-cols-12 lg:px-8 lg:gap-8">
           <AdminSidebar
             userEmail={userInfo?.email}
             userRole={userInfo?.role}
             onSignOut={handleSignOut}
           />
 
-          <div className="space-y-8 lg:col-span-9 col-span-1 md:col-span-2">
+          <div className="space-y-6 sm:space-y-8 lg:col-span-9 col-span-1 md:col-span-2">
             <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-400">Inventory</p>
-                <h1 className="mt-1 text-3xl font-semibold text-white sm:text-4xl">Admin dashboard</h1>
+                <h1 className="mt-1 text-2xl sm:text-3xl lg:text-4xl font-semibold text-white">Admin dashboard</h1>
                 <p className="text-sm text-slate-300">Manage and track your product inventory.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
