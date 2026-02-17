@@ -17,7 +17,7 @@ const ProductSchema = zod.object({
   sku: zod.string().min(1, 'SKU is required'),
   description: zod.string().optional(),
   price: zod.number().positive('Price must be positive'),
-  stock: zod.number().nonnegative('Stock cannot be negative').default(0),
+  stock: zod.number().nonnegative('Stock cannot be negative'),
   categoryId: zod.number().positive('Category is required'),
 })
 

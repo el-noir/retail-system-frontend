@@ -27,7 +27,7 @@ const initialState: PurchasesState = {
 export const fetchPurchaseOrders = createAsyncThunk(
   'purchases/fetchPurchaseOrders',
   async ({ status, limit = 50, offset = 0 }: { status?: PurchaseStatus; limit?: number; offset?: number }) => {
-    const response = await getPurchaseOrders(status, limit, offset)
+    const response = await getPurchaseOrders(status, undefined, limit, offset)
     return response
   }
 )

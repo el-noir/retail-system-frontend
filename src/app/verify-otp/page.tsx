@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/lib/auth/auth-context';
 import { verifyOtp, finalizeRegistration } from '@/lib/api/auth';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 const VerifyOtpSchema = z.object({
@@ -19,7 +19,7 @@ const VerifyOtpSchema = z.object({
 
 type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { setToken } = useAuth();
@@ -130,5 +130,17 @@ export default function VerifyOtpPage() {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function VerifyOtpPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-950">
+                <div className="text-white">Loading...</div>
+            </div>
+        }>
+            <VerifyOtpContent />
+        </Suspense>
     );
 }
