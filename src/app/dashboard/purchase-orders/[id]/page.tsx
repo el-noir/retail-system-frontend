@@ -42,7 +42,7 @@ import {
   PurchaseStatus,
   type PurchaseItem,
 } from '@/lib/api/purchase-orders'
-import { createPaymentIntent } from '@/lib/api/payments'
+import { createPaymentIntent, getPaymentsByPurchaseOrder, type Payment, PaymentStatus } from '@/lib/api/payments'
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
@@ -105,6 +105,7 @@ export default function PurchaseOrderDetailPage() {
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null)
   const [receiveQty, setReceiveQty] = useState(0)
+  const [existingPayment, setExistingPayment] = useState<Payment | null>(null)
 
   useEffect(() => {
     loadOrder()
@@ -115,6 +116,22 @@ export default function PurchaseOrderDetailPage() {
       setLoading(true)
       const data = await getPurchaseOrder(orderId)
       setOrder(data)
+      
+      // Check if payment already exists for this order
+      if (data.status === PurchaseStatus.APPROVED || data.status === PurchaseStatus.PAID) {
+        try {
+          const payments = await getPaymentsByPurchaseOrder(orderId)
+          if (payments && payments.length > 0) {
+            setExistingPayment(payments[0])
+            // If payment exists with client secret, set it for display
+            if (payments[0].stripeClientSecret) {
+              setClientSecret(payments[0].stripeClientSecret)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load payment info:', error)
+        }
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to load order')
     } finally {
@@ -136,8 +153,18 @@ export default function PurchaseOrderDetailPage() {
 
   const handlePayment = async () => {
     try {
+      // If payment already exists with client secret, just open the dialog
+      if (existingPayment?.stripeClientSecret) {
+        setClientSecret(existingPayment.stripeClientSecret)
+        setPaymentDialogOpen(true)
+        toast.info('Continuing with existing payment')
+        return
+      }
+      
+      // Otherwise create new payment intent
       const response = await createPaymentIntent(orderId)
       setClientSecret(response.clientSecret)
+      setExistingPayment(response.payment)
       setPaymentDialogOpen(true)
     } catch (error: any) {
       toast.error(error.message || 'Failed to initiate payment')
@@ -355,7 +382,14 @@ export default function PurchaseOrderDetailPage() {
             )}
             {order.status === PurchaseStatus.APPROVED && (
               <>
-                <Button onClick={handlePayment}>Pay Supplier (Stripe)</Button>
+                <Button onClick={handlePayment}>
+                  {existingPayment ? 'Continue Payment' : 'Pay Supplier (Stripe)'}
+                </Button>
+                {existingPayment && (
+                  <Badge className="ml-2" variant={existingPayment.status === PaymentStatus.SUCCEEDED ? 'default' : 'secondary'}>
+                    Payment: {existingPayment.status}
+                  </Badge>
+                )}
                 <Button variant="destructive" onClick={handleCancel}>
                   Cancel Order
                 </Button>
