@@ -210,13 +210,10 @@ export default function PurchaseOrderDetailPage() {
           if (payments && payments.length > 0) {
             const latestPayment = payments[0]
             setExistingPayment(latestPayment)
+            console.log('Found existing payment:', latestPayment.id, 'Status:', latestPayment.status)
             
-            // If payment is still valid (PENDING or PROCESSING), keep the client secret
-            if (latestPayment.stripeClientSecret && 
-                (latestPayment.status === 'PENDING' || latestPayment.status === 'PROCESSING')) {
-              setClientSecret(latestPayment.stripeClientSecret)
-              console.log('Reusing existing payment intent:', latestPayment.id)
-            }
+            // DON'T automatically set clientSecret here - only set it when user clicks Pay button
+            // This prevents race conditions where payment succeeds but webhook hasn't updated backend yet
           }
         } catch (error) {
           console.error('Failed to load payment info:', error)
@@ -259,11 +256,17 @@ export default function PurchaseOrderDetailPage() {
       if (existingPayment?.stripeClientSecret && 
           (existingPayment.status === PaymentStatus.PENDING || 
            existingPayment.status === PaymentStatus.PROCESSING)) {
-        console.log('Reusing existing payment intent:', existingPayment.id)
+        console.log('Reusing existing payment intent:', existingPayment.id, 'Status:', existingPayment.status)
         setClientSecret(existingPayment.stripeClientSecret)
         setPaymentDialogOpen(true)
         toast.info('Continuing with existing payment')
         return
+      }
+      
+      // If payment is FAILED, allow creating a new one
+      if (existingPayment?.status === PaymentStatus.FAILED) {
+        console.log('Previous payment failed, will create new payment intent')
+        setExistingPayment(null)
       }
       
       // Mark as creating to prevent duplicates
@@ -280,7 +283,7 @@ export default function PurchaseOrderDetailPage() {
         throw new Error('Invalid payment response from server')
       }
       
-      console.log('New payment intent created:', response.payment.id)
+      console.log('New payment intent created:', response.payment.id, 'Status:', response.payment.status)
       setClientSecret(response.clientSecret)
       setExistingPayment(response.payment)
       setPaymentDialogOpen(true)
@@ -309,7 +312,12 @@ export default function PurchaseOrderDetailPage() {
   const handlePaymentSuccess = () => {
     setPaymentDialogOpen(false)
     setClientSecret(null)
-    loadOrder()
+    setExistingPayment(null) // Clear existing payment to force refresh
+    toast.success('Payment completed! Refreshing order...')
+    // Give backend time to process webhook before reloading
+    setTimeout(() => {
+      loadOrder()
+    }, 2000)
   }
 
   const handlePaymentDialogClose = (open: boolean) => {
@@ -318,6 +326,8 @@ export default function PurchaseOrderDetailPage() {
       // Clean up when dialog closes
       setTimeout(() => {
         setClientSecret(null)
+        // Reset creating flag in case dialog was closed during creation
+        isCreatingPaymentRef.current = false
       }, 300) // Small delay to allow animation
     }
   }
