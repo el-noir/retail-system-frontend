@@ -45,7 +45,10 @@ import {
 import { createPaymentIntent, getPaymentsByPurchaseOrder, type Payment, PaymentStatus } from '@/lib/api/payments'
 
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+  {
+    locale: 'en',
+  }
 )
 
 function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSuccess: () => void }) {
@@ -53,12 +56,20 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
   const elements = useElements()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!stripe || !elements) {
       setError('Stripe has not loaded yet. Please wait.')
+      toast.error('Stripe has not loaded yet. Please wait.')
+      return
+    }
+
+    if (!isReady) {
+      setError('Payment form is still loading. Please wait.')
+      toast.error('Payment form is still loading. Please wait.')
       return
     }
 
@@ -66,10 +77,21 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
     setError(null)
 
     try {
+      // Submit the form to collect payment details
+      const { error: submitError } = await elements.submit()
+      
+      if (submitError) {
+        setError(submitError.message || 'Failed to submit payment details')
+        toast.error(submitError.message || 'Failed to submit payment details')
+        setLoading(false)
+        return
+      }
+
+      // Confirm the payment
       const result = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: window.location.href,
+          return_url: `${window.location.origin}/dashboard/purchase-orders`,
         },
         redirect: 'if_required',
       })
@@ -81,8 +103,11 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       } else if (result.paymentIntent?.status === 'succeeded') {
         toast.success('Payment successful!')
         onSuccess()
+      } else if (result.paymentIntent?.status === 'processing') {
+        toast.info('Payment is processing...')
+        onSuccess()
       } else {
-        toast.info('Payment processing...')
+        toast.info('Payment initiated')
         onSuccess()
       }
     } catch (error: any) {
@@ -97,8 +122,9 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement 
+        onReady={() => setIsReady(true)}
         options={{
-          layout: 'tabs'
+          layout: 'tabs',
         }}
       />
       {error && (
@@ -106,8 +132,12 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
           {error}
         </div>
       )}
-      <Button type="submit" disabled={!stripe || loading} className="w-full">
-        {loading ? 'Processing...' : 'Pay Now'}
+      <Button 
+        type="submit" 
+        disabled={!stripe || !isReady || loading} 
+        className="w-full"
+      >
+        {!isReady ? 'Loading payment form...' : loading ? 'Processing...' : 'Pay Now'}
       </Button>
     </form>
   )
@@ -209,6 +239,16 @@ export default function PurchaseOrderDetailPage() {
     setPaymentDialogOpen(false)
     setClientSecret(null)
     loadOrder()
+  }
+
+  const handlePaymentDialogClose = (open: boolean) => {
+    setPaymentDialogOpen(open)
+    if (!open) {
+      // Clean up when dialog closes
+      setTimeout(() => {
+        setClientSecret(null)
+      }, 300) // Small delay to allow animation
+    }
   }
 
   const handleReceiveGoods = (item: PurchaseItem) => {
@@ -437,7 +477,7 @@ export default function PurchaseOrderDetailPage() {
       </div>
 
       {/* Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      <Dialog open={paymentDialogOpen} onOpenChange={handlePaymentDialogClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Pay Supplier via Stripe</DialogTitle>
@@ -453,8 +493,11 @@ export default function PurchaseOrderDetailPage() {
                 clientSecret,
                 appearance: {
                   theme: 'stripe',
+                  variables: {
+                    colorPrimary: '#10b981',
+                  },
                 },
-                loader: 'auto',
+                locale: 'en',
               }}
             >
               <PaymentForm
