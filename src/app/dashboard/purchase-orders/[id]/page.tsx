@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -57,17 +57,23 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const isProcessingRef = useRef(false)
 
   useEffect(() => {
     console.log('PaymentForm mounted with clientSecret:', clientSecret?.substring(0, 20) + '...')
+    
+    // Reset processing state when component mounts with new clientSecret
+    return () => {
+      isProcessingRef.current = false
+    }
   }, [clientSecret])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Prevent double submission
-    if (isProcessing) {
+    // CRITICAL: Prevent duplicate submissions
+    if (isProcessingRef.current) {
+      console.log('Payment already processing, ignoring duplicate submission')
       return
     }
 
@@ -83,9 +89,12 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       return
     }
 
+    // Mark as processing to prevent duplicates
+    isProcessingRef.current = true
     setLoading(true)
-    setIsProcessing(true)
     setError(null)
+
+    console.log('Starting payment confirmation...')
 
     try {
       // Confirm the payment directly with Stripe.js v4
@@ -108,12 +117,14 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
         setError(errorMessage)
         toast.error(errorMessage)
         setLoading(false)
-        setIsProcessing(false)
+        isProcessingRef.current = false
         return
       }
 
       // Check payment intent status
       if (paymentIntent) {
+        console.log('Payment intent status:', paymentIntent.status)
+        
         if (paymentIntent.status === 'succeeded') {
           toast.success('Payment successful!')
           onSuccess()
@@ -124,7 +135,7 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
           setError('Payment failed. Please try a different payment method.')
           toast.error('Payment failed. Please try a different payment method.')
           setLoading(false)
-          setIsProcessing(false)
+          isProcessingRef.current = false
         } else {
           toast.info(`Payment status: ${paymentIntent.status}`)
           onSuccess()
@@ -136,14 +147,17 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       setError(errorMessage)
       toast.error(errorMessage)
       setLoading(false)
-      setIsProcessing(false)
+      isProcessingRef.current = false
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement 
-        onReady={() => setIsReady(true)}
+        onReady={() => {
+          console.log('PaymentElement ready')
+          setIsReady(true)
+        }}
         options={{
           layout: 'tabs',
         }}
@@ -155,7 +169,7 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       )}
       <Button 
         type="submit" 
-        disabled={!stripe || !isReady || loading || isProcessing} 
+        disabled={!stripe || !isReady || loading || isProcessingRef.current} 
         className="w-full"
       >
         {!isReady ? 'Loading payment form...' : loading ? 'Processing...' : 'Pay Now'}
@@ -176,6 +190,8 @@ export default function PurchaseOrderDetailPage() {
   const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null)
   const [receiveQty, setReceiveQty] = useState(0)
   const [existingPayment, setExistingPayment] = useState<Payment | null>(null)
+  const isCreatingPaymentRef = useRef(false)
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false)
 
   useEffect(() => {
     loadOrder()
@@ -226,6 +242,12 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const handlePayment = async () => {
+    // CRITICAL: Prevent duplicate payment creation
+    if (isCreatingPaymentRef.current) {
+      console.log('Payment creation already in progress, ignoring duplicate call')
+      return
+    }
+
     try {
       // If payment already completed, don't allow retrying
       if (existingPayment?.status === PaymentStatus.SUCCEEDED) {
@@ -243,6 +265,10 @@ export default function PurchaseOrderDetailPage() {
         toast.info('Continuing with existing payment')
         return
       }
+      
+      // Mark as creating to prevent duplicates
+      isCreatingPaymentRef.current = true
+      setIsPaymentLoading(true)
       
       // Only create new payment intent if no valid payment exists
       // This will fail if backend already has a payment for this order
@@ -271,6 +297,12 @@ export default function PurchaseOrderDetailPage() {
       } else {
         toast.error(errorMessage)
       }
+    } finally {
+      setIsPaymentLoading(false)
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        isCreatingPaymentRef.current = false
+      }, 1000)
     }
   }
 
@@ -495,11 +527,16 @@ export default function PurchaseOrderDetailPage() {
             )}
             {order.status === PurchaseStatus.APPROVED && (
               <>
-                <Button onClick={handlePayment}>
-                  {existingPayment?.status === PaymentStatus.PENDING || 
-                   existingPayment?.status === PaymentStatus.PROCESSING 
-                    ? 'Continue Payment' 
-                    : 'Pay Supplier (Stripe)'}
+                <Button 
+                  onClick={handlePayment}
+                  disabled={isPaymentLoading}
+                >
+                  {isPaymentLoading ? 'Creating payment...' : (
+                    existingPayment?.status === PaymentStatus.PENDING || 
+                    existingPayment?.status === PaymentStatus.PROCESSING 
+                      ? 'Continue Payment' 
+                      : 'Pay Supplier (Stripe)'
+                  )}
                 </Button>
                 {existingPayment && (
                   <Badge 
