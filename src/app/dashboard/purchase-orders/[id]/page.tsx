@@ -252,29 +252,18 @@ export default function PurchaseOrderDetailPage() {
         return
       }
       
-      // If there's a valid existing payment (PENDING/PROCESSING), reuse it
-      if (existingPayment?.stripeClientSecret && 
-          (existingPayment.status === PaymentStatus.PENDING || 
-           existingPayment.status === PaymentStatus.PROCESSING)) {
-        console.log('Reusing existing payment intent:', existingPayment.id, 'Status:', existingPayment.status)
-        setClientSecret(existingPayment.stripeClientSecret)
-        setPaymentDialogOpen(true)
-        toast.info('Continuing with existing payment')
+      // If payment exists in any state (PENDING, PROCESSING, FAILED), show error
+      // Let user refresh the page to check latest status from backend
+      if (existingPayment && existingPayment.status !== PaymentStatus.SUCCEEDED) {
+        toast.error(`A payment already exists with status: ${existingPayment.status}. Please refresh the page to check the latest status.`)
         return
-      }
-      
-      // If payment is FAILED, allow creating a new one
-      if (existingPayment?.status === PaymentStatus.FAILED) {
-        console.log('Previous payment failed, will create new payment intent')
-        setExistingPayment(null)
       }
       
       // Mark as creating to prevent duplicates
       isCreatingPaymentRef.current = true
       setIsPaymentLoading(true)
       
-      // Only create new payment intent if no valid payment exists
-      // This will fail if backend already has a payment for this order
+      // Create new payment intent
       console.log('Creating new payment intent for order:', orderId)
       const response = await createPaymentIntent(orderId)
       
@@ -291,12 +280,12 @@ export default function PurchaseOrderDetailPage() {
       console.error('Payment error:', error)
       const errorMessage = error.message || 'Failed to initiate payment'
       
-      // If payment already exists error, reload the page to get the existing payment
-      if (errorMessage.includes('already exists')) {
-        toast.error('Payment already exists. Reloading...')
+      // If payment already exists, show clear message
+      if (errorMessage.includes('already exists') || errorMessage.includes('already has a payment')) {
+        toast.error('A payment already exists for this order. Refreshing page...')
         setTimeout(() => {
-          loadOrder()
-        }, 1000)
+          window.location.reload()
+        }, 1500)
       } else {
         toast.error(errorMessage)
       }
@@ -310,13 +299,13 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const handlePaymentSuccess = () => {
+    toast.success('Payment completed! Refreshing page...')
+    // Close dialog and reload the entire page to get fresh data
     setPaymentDialogOpen(false)
     setClientSecret(null)
-    setExistingPayment(null) // Clear existing payment to force refresh
-    toast.success('Payment completed! Refreshing order...')
     // Give backend time to process webhook before reloading
     setTimeout(() => {
-      loadOrder()
+      window.location.reload()
     }, 2000)
   }
 
@@ -539,14 +528,9 @@ export default function PurchaseOrderDetailPage() {
               <>
                 <Button 
                   onClick={handlePayment}
-                  disabled={isPaymentLoading}
+                  disabled={isPaymentLoading || existingPayment?.status === PaymentStatus.SUCCEEDED}
                 >
-                  {isPaymentLoading ? 'Creating payment...' : (
-                    existingPayment?.status === PaymentStatus.PENDING || 
-                    existingPayment?.status === PaymentStatus.PROCESSING 
-                      ? 'Continue Payment' 
-                      : 'Pay Supplier (Stripe)'
-                  )}
+                  {isPaymentLoading ? 'Creating payment...' : 'Pay Supplier (Stripe)'}
                 </Button>
                 {existingPayment && (
                   <Badge 
