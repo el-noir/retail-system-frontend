@@ -57,9 +57,19 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  useEffect(() => {
+    console.log('PaymentForm mounted with clientSecret:', clientSecret?.substring(0, 20) + '...')
+  }, [clientSecret])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Prevent double submission
+    if (isProcessing) {
+      return
+    }
 
     if (!stripe || !elements) {
       setError('Stripe has not loaded yet. Please wait.')
@@ -74,21 +84,12 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
     }
 
     setLoading(true)
+    setIsProcessing(true)
     setError(null)
 
     try {
-      // Submit the form to collect payment details
-      const { error: submitError } = await elements.submit()
-      
-      if (submitError) {
-        setError(submitError.message || 'Failed to submit payment details')
-        toast.error(submitError.message || 'Failed to submit payment details')
-        setLoading(false)
-        return
-      }
-
-      // Confirm the payment
-      const result = await stripe.confirmPayment({
+      // Confirm the payment directly with Stripe.js v4
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/dashboard/purchase-orders`,
@@ -96,26 +97,46 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
         redirect: 'if_required',
       })
 
-      if (result.error) {
-        const errorMessage = result.error.message || 'Payment failed'
+      if (confirmError) {
+        console.error('Payment confirmation error:', confirmError)
+        console.error('Error type:', confirmError.type)
+        console.error('Error code:', confirmError.code)
+        console.error('Error decline code:', confirmError.decline_code)
+        console.error('Error message:', confirmError.message)
+        
+        const errorMessage = confirmError.message || 'Payment failed'
         setError(errorMessage)
         toast.error(errorMessage)
-      } else if (result.paymentIntent?.status === 'succeeded') {
-        toast.success('Payment successful!')
-        onSuccess()
-      } else if (result.paymentIntent?.status === 'processing') {
-        toast.info('Payment is processing...')
-        onSuccess()
-      } else {
-        toast.info('Payment initiated')
-        onSuccess()
+        setLoading(false)
+        setIsProcessing(false)
+        return
+      }
+
+      // Check payment intent status
+      if (paymentIntent) {
+        if (paymentIntent.status === 'succeeded') {
+          toast.success('Payment successful!')
+          onSuccess()
+        } else if (paymentIntent.status === 'processing') {
+          toast.info('Payment is processing...')
+          onSuccess()
+        } else if (paymentIntent.status === 'requires_payment_method') {
+          setError('Payment failed. Please try a different payment method.')
+          toast.error('Payment failed. Please try a different payment method.')
+          setLoading(false)
+          setIsProcessing(false)
+        } else {
+          toast.info(`Payment status: ${paymentIntent.status}`)
+          onSuccess()
+        }
       }
     } catch (error: any) {
+      console.error('Payment error:', error)
       const errorMessage = error.message || 'Payment failed'
       setError(errorMessage)
       toast.error(errorMessage)
-    } finally {
       setLoading(false)
+      setIsProcessing(false)
     }
   }
 
@@ -134,7 +155,7 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       )}
       <Button 
         type="submit" 
-        disabled={!stripe || !isReady || loading} 
+        disabled={!stripe || !isReady || loading || isProcessing} 
         className="w-full"
       >
         {!isReady ? 'Loading payment form...' : loading ? 'Processing...' : 'Pay Now'}
@@ -171,10 +192,14 @@ export default function PurchaseOrderDetailPage() {
         try {
           const payments = await getPaymentsByPurchaseOrder(orderId)
           if (payments && payments.length > 0) {
-            setExistingPayment(payments[0])
-            // If payment exists with client secret, set it for display
-            if (payments[0].stripeClientSecret) {
-              setClientSecret(payments[0].stripeClientSecret)
+            const latestPayment = payments[0]
+            setExistingPayment(latestPayment)
+            
+            // If payment is still valid (PENDING or PROCESSING), keep the client secret
+            if (latestPayment.stripeClientSecret && 
+                (latestPayment.status === 'PENDING' || latestPayment.status === 'PROCESSING')) {
+              setClientSecret(latestPayment.stripeClientSecret)
+              console.log('Reusing existing payment intent:', latestPayment.id)
             }
           }
         } catch (error) {
@@ -202,22 +227,26 @@ export default function PurchaseOrderDetailPage() {
 
   const handlePayment = async () => {
     try {
-      // If payment already exists with client secret, check if it's still valid
-      if (existingPayment?.stripeClientSecret) {
-        // Check if the payment is still pending or processing
-        if (existingPayment.status === PaymentStatus.PENDING || 
-            existingPayment.status === PaymentStatus.PROCESSING) {
-          setClientSecret(existingPayment.stripeClientSecret)
-          setPaymentDialogOpen(true)
-          toast.info('Continuing with existing payment')
-          return
-        } else if (existingPayment.status === PaymentStatus.SUCCEEDED) {
-          toast.info('Payment already completed')
-          return
-        }
+      // If payment already completed, don't allow retrying
+      if (existingPayment?.status === PaymentStatus.SUCCEEDED) {
+        toast.info('Payment already completed successfully')
+        return
       }
       
-      // Create new payment intent
+      // If there's a valid existing payment (PENDING/PROCESSING), reuse it
+      if (existingPayment?.stripeClientSecret && 
+          (existingPayment.status === PaymentStatus.PENDING || 
+           existingPayment.status === PaymentStatus.PROCESSING)) {
+        console.log('Reusing existing payment intent:', existingPayment.id)
+        setClientSecret(existingPayment.stripeClientSecret)
+        setPaymentDialogOpen(true)
+        toast.info('Continuing with existing payment')
+        return
+      }
+      
+      // Only create new payment intent if no valid payment exists
+      // This will fail if backend already has a payment for this order
+      console.log('Creating new payment intent for order:', orderId)
       const response = await createPaymentIntent(orderId)
       
       // Validate the response
@@ -225,13 +254,23 @@ export default function PurchaseOrderDetailPage() {
         throw new Error('Invalid payment response from server')
       }
       
+      console.log('New payment intent created:', response.payment.id)
       setClientSecret(response.clientSecret)
       setExistingPayment(response.payment)
       setPaymentDialogOpen(true)
     } catch (error: any) {
       console.error('Payment error:', error)
       const errorMessage = error.message || 'Failed to initiate payment'
-      toast.error(errorMessage)
+      
+      // If payment already exists error, reload the page to get the existing payment
+      if (errorMessage.includes('already exists')) {
+        toast.error('Payment already exists. Reloading...')
+        setTimeout(() => {
+          loadOrder()
+        }, 1000)
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 
@@ -457,10 +496,16 @@ export default function PurchaseOrderDetailPage() {
             {order.status === PurchaseStatus.APPROVED && (
               <>
                 <Button onClick={handlePayment}>
-                  {existingPayment ? 'Continue Payment' : 'Pay Supplier (Stripe)'}
+                  {existingPayment?.status === PaymentStatus.PENDING || 
+                   existingPayment?.status === PaymentStatus.PROCESSING 
+                    ? 'Continue Payment' 
+                    : 'Pay Supplier (Stripe)'}
                 </Button>
                 {existingPayment && (
-                  <Badge className="ml-2" variant={existingPayment.status === PaymentStatus.SUCCEEDED ? 'default' : 'secondary'}>
+                  <Badge 
+                    className="ml-2" 
+                    variant={existingPayment.status === PaymentStatus.SUCCEEDED ? 'default' : 'secondary'}
+                  >
                     Payment: {existingPayment.status}
                   </Badge>
                 )}
