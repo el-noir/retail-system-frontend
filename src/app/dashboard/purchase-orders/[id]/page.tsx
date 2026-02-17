@@ -252,9 +252,9 @@ export default function PurchaseOrderDetailPage() {
         return
       }
       
-      // If payment exists in any state (PENDING, PROCESSING, FAILED), show error
+      // If payment exists in any other state (PENDING, PROCESSING, FAILED), show error
       // Let user refresh the page to check latest status from backend
-      if (existingPayment && existingPayment.status !== PaymentStatus.SUCCEEDED) {
+      if (existingPayment) {
         toast.error(`A payment already exists with status: ${existingPayment.status}. Please refresh the page to check the latest status.`)
         return
       }
