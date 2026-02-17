@@ -52,15 +52,18 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!stripe || !elements) {
+      setError('Stripe has not loaded yet. Please wait.')
       return
     }
 
     setLoading(true)
+    setError(null)
 
     try {
       const result = await stripe.confirmPayment({
@@ -72,13 +75,20 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
       })
 
       if (result.error) {
-        toast.error(result.error.message || 'Payment failed')
-      } else {
+        const errorMessage = result.error.message || 'Payment failed'
+        setError(errorMessage)
+        toast.error(errorMessage)
+      } else if (result.paymentIntent?.status === 'succeeded') {
         toast.success('Payment successful!')
+        onSuccess()
+      } else {
+        toast.info('Payment processing...')
         onSuccess()
       }
     } catch (error: any) {
-      toast.error(error.message || 'Payment failed')
+      const errorMessage = error.message || 'Payment failed'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -86,7 +96,16 @@ function PaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSucc
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
+      <PaymentElement 
+        options={{
+          layout: 'tabs'
+        }}
+      />
+      {error && (
+        <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
+          {error}
+        </div>
+      )}
       <Button type="submit" disabled={!stripe || loading} className="w-full">
         {loading ? 'Processing...' : 'Pay Now'}
       </Button>
@@ -153,21 +172,36 @@ export default function PurchaseOrderDetailPage() {
 
   const handlePayment = async () => {
     try {
-      // If payment already exists with client secret, just open the dialog
+      // If payment already exists with client secret, check if it's still valid
       if (existingPayment?.stripeClientSecret) {
-        setClientSecret(existingPayment.stripeClientSecret)
-        setPaymentDialogOpen(true)
-        toast.info('Continuing with existing payment')
-        return
+        // Check if the payment is still pending or processing
+        if (existingPayment.status === PaymentStatus.PENDING || 
+            existingPayment.status === PaymentStatus.PROCESSING) {
+          setClientSecret(existingPayment.stripeClientSecret)
+          setPaymentDialogOpen(true)
+          toast.info('Continuing with existing payment')
+          return
+        } else if (existingPayment.status === PaymentStatus.SUCCEEDED) {
+          toast.info('Payment already completed')
+          return
+        }
       }
       
-      // Otherwise create new payment intent
+      // Create new payment intent
       const response = await createPaymentIntent(orderId)
+      
+      // Validate the response
+      if (!response.clientSecret || !response.payment) {
+        throw new Error('Invalid payment response from server')
+      }
+      
       setClientSecret(response.clientSecret)
       setExistingPayment(response.payment)
       setPaymentDialogOpen(true)
     } catch (error: any) {
-      toast.error(error.message || 'Failed to initiate payment')
+      console.error('Payment error:', error)
+      const errorMessage = error.message || 'Failed to initiate payment'
+      toast.error(errorMessage)
     }
   }
 
@@ -411,13 +445,27 @@ export default function PurchaseOrderDetailPage() {
               Total: ${Number(order.totalAmount).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
-          {clientSecret && (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
+          {clientSecret ? (
+            <Elements 
+              key={clientSecret}
+              stripe={stripePromise} 
+              options={{ 
+                clientSecret,
+                appearance: {
+                  theme: 'stripe',
+                },
+                loader: 'auto',
+              }}
+            >
               <PaymentForm
                 clientSecret={clientSecret}
                 onSuccess={handlePaymentSuccess}
               />
             </Elements>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground">Loading payment form...</p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
